@@ -1,0 +1,30 @@
+{
+  "updated_at": "2026-03-16T03:04:41.767815+00:00",
+  "state": "running",
+  "cumulative_count": 6583,
+  "tweets_this_week": 1,
+  "prediction": {
+    "weekly_total": 0,
+    "bayesian_total": 0,
+    "ci_lower": 0,
+    "ci_upper": 0,
+    "event_factor": 0.0,
+    "event_adjustment_pct": 0.0,
+    "days_observed": 0,
+    "days_remaining": 7,
+    "posterior_mean": 0.0,
+    "posterior_std": 0.0
+  },
+  "active_trackings": [],
+  "model": {
+    "prior_mean": 288.9,
+    "prior_std": 239.53,
+    "training_weeks": 919,
+    "event_factor": 0.0
+  },
+  "files": {
+    "csv": "/app/data/elonmusk_tweet_history.csv",
+    "model": "/app/data/bayesian_model.pkl",
+    "log": "/app/data/tweet_predictor.log"
+  }
+}

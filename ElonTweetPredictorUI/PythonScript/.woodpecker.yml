@@ -1,0 +1,23 @@
+when:
+  event:
+    - push
+    - manual
+
+steps:
+  build_and_deploy:
+    image: docker:27.3-cli
+    pull: true
+    privileged: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      NEWS_API_KEY:
+        from_secret: news_api_key
+      DISCORD_WEBHOOK_URL:
+        from_secret: discord_webhook_url
+    commands:
+      - echo "NEWS_API_KEY=$${NEWS_API_KEY}" > .env
+      - echo "DISCORD_WEBHOOK_URL=$${DISCORD_WEBHOOK_URL}" >> .env
+      - docker build -t elon-tweet-predictor:latest .
+      - docker compose down
+      - docker compose up -d --force-recreate

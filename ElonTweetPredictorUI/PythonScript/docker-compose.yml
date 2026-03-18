@@ -1,0 +1,43 @@
+services:
+  tweet-predictor:
+    build: .
+    container_name: elon-tweet-predictor
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/New_York
+      - DATA_DIR=/app/data
+    volumes:
+      - ./data:/app/data
+
+  tweet-predictor-ui:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: elon-tweet-predictor-ui
+    restart: unless-stopped
+    depends_on:
+      - tweet-predictor
+    environment:
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+      ASPNETCORE_ENVIRONMENT: Production
+      DataPath: /app/data
+      TZ: America/New_York
+    volumes:
+      - ./data:/app/data
+    networks:
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+
+      - traefik.http.routers.elon.rule=Host(`elon.incuzentric.com`)
+      - traefik.http.routers.elon.entrypoints=websecure
+      - traefik.http.routers.elon.tls.certresolver=le
+      - traefik.http.services.elon.loadbalancer.server.port=8080
+
+networks:
+  proxy:
+    external: true
