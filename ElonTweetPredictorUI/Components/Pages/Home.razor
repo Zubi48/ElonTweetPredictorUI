@@ -2,8 +2,8 @@
 @rendermode InteractiveServer
 @implements IDisposable
 @inject IStatusService StatusService
-@inject ILogService LogService
-@inject IModelFileService ModelFileService
+@inject IBetProbabilityService BetProbabilityService
+@inject IDataChangeNotifier DataChangeNotifier
 
 <PageTitle>Tweet Predictor Dashboard</PageTitle>
 
@@ -36,10 +36,66 @@ else
                 <span class="text-muted small ms-2">Last update: @FormatTimestamp(_status.UpdatedAt)</span>
             </div>
             <div class="text-muted small">
-                Next refresh in <strong>@_secondsUntilRefresh</strong>s
+                Live updates enabled
             </div>
         </div>
     </div>
+
+    @if (_betProbabilities is not null && _betProbabilities.Trackings.Count > 0)
+    {
+        <div class="card bg-dark border-secondary mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="card-title mb-0">🎲 Bet Probabilities (@_betProbabilities.Trackings.Count)</h6>
+                    <span class="small text-muted">Updated: @FormatTimestamp(_betProbabilities.Timestamp)</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-dark table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Market</th>
+                                <th class="text-end">Tweets</th>
+                                <th class="text-end">Predicted</th>
+                                <th class="text-end">95% CI</th>
+                                <th class="text-end">Elapsed</th>
+                                <th class="text-end">Remaining</th>
+                                @if (_betProbabilities.Trackings.Any(t => t.HasKellyData))
+                                {
+                                    <th class="text-end">Side</th>
+                                    <th class="text-end">Edge</th>
+                                    <th class="text-end">Kelly %</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var t in _betProbabilities.Trackings)
+                            {
+                                <tr>
+                                    <td>
+                                        <div>@t.Title</div>
+                                        <small class="text-muted">@t.TrackingId[..8]…</small>
+                                    </td>
+                                    <td class="text-end text-primary"><strong>@t.TweetsInWindow.ToString("N0")</strong></td>
+                                    <td class="text-end text-info"><strong>@t.WindowPrediction.ToString("N0")</strong></td>
+                                    <td class="text-end"><span class="small">@t.WindowCiLower.ToString("N0")–@t.WindowCiUpper.ToString("N0")</span></td>
+                                    <td class="text-end">@t.ElapsedDays.ToString("F1")d</td>
+                                    <td class="text-end">@t.RemainingDays.ToString("F1")d</td>
+                                    @if (_betProbabilities.Trackings.Any(bt => bt.HasKellyData))
+                                    {
+                                        <td class="text-end"><strong>@(t.TierEmoji ?? "") @(t.Side ?? "—")</strong></td>
+                                        <td class="text-end @(t.EdgePct >= 0 ? "text-success" : "text-danger")">
+                                            @(t.EdgePct is not null ? $"{(t.EdgePct >= 0 ? "+" : "")}{t.EdgePct:F1}%" : "—")
+                                        </td>
+                                        <td class="text-end">@(t.FracKellyPct?.ToString("F1") ?? "—")%</td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
 
     <div class="row g-3 mb-4">
         <div class="col-md-3">
@@ -153,19 +209,22 @@ else
                             </div>
 
                             @{
-                                var pred = ComputeWindowPrediction(tracking);
+                                var betProb = GetBetProbability(tracking.Id);
+                                var pred = betProb is not null
+                                    ? (betProb.WindowPrediction, betProb.WindowCiLower, betProb.WindowCiUpper, betProb.ElapsedDays, betProb.RemainingDays, betProb.TweetsInWindow / Math.Max(betProb.ElapsedDays, 0.5))
+                                    : ComputeWindowPrediction(tracking);
                             }
                             @if (pred is not null)
                             {
                                 <div class="window-prediction mb-3">
-                                    <div class="stat-label mb-2">🔮 Window Prediction</div>
+                                    <div class="stat-label mb-2">🔮 Window Prediction @(betProb is not null ? "(Python)" : "(UI est.)")</div>
                                     <div class="d-flex justify-content-between align-items-baseline mb-1">
-                                        <span class="h5 mb-0 text-info">@pred.Value.Predicted.ToString("N0")</span>
-                                        <span class="small text-muted">CI: @pred.Value.Lower.ToString("N0")–@pred.Value.Upper.ToString("N0")</span>
+                                        <span class="h5 mb-0 text-info">@pred.Value.Item1.ToString("N0")</span>
+                                        <span class="small text-muted">CI: @pred.Value.Item2.ToString("N0")–@pred.Value.Item3.ToString("N0")</span>
                                     </div>
                                     <div class="small text-muted">
-                                        @pred.Value.ElapsedDays.ToString("F1")d elapsed · @pred.Value.RemainingDays.ToString("F1")d left · 
-                                        @pred.Value.ObservedRate.ToString("F1") tweets/day observed
+                                        @pred.Value.Item4.ToString("F1")d elapsed · @pred.Value.Item5.ToString("F1")d left · 
+                                        @pred.Value.Item6.ToString("F1") tweets/day observed
                                     </div>
                                 </div>
                             }
@@ -174,46 +233,78 @@ else
                             {
                                 <div class="kelly-calculator">
                                     <div class="stat-label mb-2">💰 Kelly Bet Calculator</div>
-                                    <div class="mb-2">
-                                        <label class="form-label small">Market YES Price (0-1)</label>
-                                        <input type="number" class="form-control form-control-sm" 
-                                               step="0.01" min="0.01" max="0.99"
-                                               value="@GetMarketPrice(tracking.Id)"
-                                               @onchange="@((e) => UpdateMarketPrice(tracking.Id, e.Value?.ToString()))" />
-                                    </div>
-                                    @{
-                                        var betResult = ComputeBet(pred.Value.Predicted, pred.Value.Lower, pred.Value.Upper, tracking.Target.Value, GetMarketPrice(tracking.Id));
-                                    }
-                                    @if (betResult is not null)
+                                    @if (betProb?.HasKellyData == true)
                                     {
                                         <div class="bet-result p-2 rounded" style="background-color: var(--bg-primary);">
                                             <div class="d-flex justify-content-between mb-2">
                                                 <span class="bet-stat">
-                                                    <strong>@betResult.TierEmoji @betResult.Side</strong>
-                                                    <small class="d-block text-muted">@betResult.Tier</small>
+                                                    <strong>@betProb.TierEmoji @betProb.Side</strong>
+                                                    <small class="d-block text-muted">@betProb.Tier (Python)</small>
                                                 </span>
                                                 <span class="bet-stat text-end">
-                                                    <strong>@betResult.FracKellyPct.ToString("F1")%</strong>
-                                                    <small class="d-block text-muted">$@betResult.BetDollars per $100</small>
+                                                    <strong>@(betProb.FracKellyPct?.ToString("F1") ?? "—")%</strong>
+                                                    <small class="d-block text-muted">$@(betProb.BetDollars?.ToString("F2") ?? "—") per $100</small>
                                                 </span>
                                             </div>
                                             <div class="row g-2 small">
                                                 <div class="col-4">
                                                     <div class="text-muted">Our P(YES)</div>
-                                                    <div><strong>@betResult.OurProbYesPct%</strong></div>
+                                                    <div><strong>@(betProb.OurProbYesPct?.ToString("F1") ?? "—")%</strong></div>
                                                 </div>
                                                 <div class="col-4">
                                                     <div class="text-muted">Market P(YES)</div>
-                                                    <div><strong>@betResult.MarketProbYesPct%</strong></div>
+                                                    <div><strong>@(betProb.MarketProbYesPct?.ToString("F1") ?? "—")%</strong></div>
                                                 </div>
                                                 <div class="col-4">
                                                     <div class="text-muted">Edge</div>
-                                                    <div class="@(betResult.EdgePct >= 0 ? "text-success" : "text-danger")">
-                                                        <strong>@(betResult.EdgePct >= 0 ? "+" : "")@betResult.EdgePct%</strong>
+                                                    <div class="@(betProb.EdgePct >= 0 ? "text-success" : "text-danger")">
+                                                        <strong>@(betProb.EdgePct >= 0 ? "+" : "")@(betProb.EdgePct?.ToString("F1") ?? "—")%</strong>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="mb-2">
+                                            <label class="form-label small">Market YES Price (0-1)</label>
+                                            <input type="number" class="form-control form-control-sm" 
+                                                   step="0.01" min="0.01" max="0.99"
+                                                   value="@GetMarketPrice(tracking.Id)"
+                                                   @onchange="@((e) => UpdateMarketPrice(tracking.Id, e.Value?.ToString()))" />
+                                        </div>
+                                        var betResult = ComputeBet(pred.Value.Item1, pred.Value.Item2, pred.Value.Item3, tracking.Target.Value, GetMarketPrice(tracking.Id));
+                                        @if (betResult is not null)
+                                        {
+                                            <div class="bet-result p-2 rounded" style="background-color: var(--bg-primary);">
+                                                <div class="d-flex justify-content-between mb-2">
+                                                    <span class="bet-stat">
+                                                        <strong>@betResult.TierEmoji @betResult.Side</strong>
+                                                        <small class="d-block text-muted">@betResult.Tier (UI est.)</small>
+                                                    </span>
+                                                    <span class="bet-stat text-end">
+                                                        <strong>@betResult.FracKellyPct.ToString("F1")%</strong>
+                                                        <small class="d-block text-muted">$@betResult.BetDollars per $100</small>
+                                                    </span>
+                                                </div>
+                                                <div class="row g-2 small">
+                                                    <div class="col-4">
+                                                        <div class="text-muted">Our P(YES)</div>
+                                                        <div><strong>@betResult.OurProbYesPct%</strong></div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <div class="text-muted">Market P(YES)</div>
+                                                        <div><strong>@betResult.MarketProbYesPct%</strong></div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <div class="text-muted">Edge</div>
+                                                        <div class="@(betResult.EdgePct >= 0 ? "text-success" : "text-danger")">
+                                                            <strong>@(betResult.EdgePct >= 0 ? "+" : "")@betResult.EdgePct%</strong>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
                                     }
                                 </div>
                             }
@@ -263,123 +354,36 @@ else
                 </div>
             </div>
         </div>
-        <div class="col-lg-6">
-            <div class="card bg-dark border-secondary">
-                <div class="card-body">
-                    <h6 class="card-title mb-3">📁 Data Files</h6>
-                    <table class="table table-sm table-dark table-borderless mb-0">
-                        <tbody>
-                            <tr>
-                                <td class="text-muted">CSV</td>
-                                <td class="text-end"><code class="small">@System.IO.Path.GetFileName(_status.Files.Csv)</code></td>
-                            </tr>
-                            <tr>
-                                <td class="text-muted">Model</td>
-                                <td class="text-end"><code class="small">@System.IO.Path.GetFileName(_status.Files.Model)</code></td>
-                            </tr>
-                            <tr>
-                                <td class="text-muted">Log</td>
-                                <td class="text-end"><code class="small">@System.IO.Path.GetFileName(_status.Files.Log)</code></td>
-                            </tr>
-                        </tbody>
-                    </table>
-
-                    <div class="mt-3 pt-3 border-top border-secondary-subtle">
-                        <h6 class="mb-2">🔁 Replace model file</h6>
-                        <p class="small text-muted mb-2">
-                            Upload a new <code>.pkl</code> file to replace <code>bayesian_model.pkl</code>.
-                            The UI will also write <code>reload.flag</code> so the Python service reloads it.
-                        </p>
-                        <InputFile OnChange="OnModelFileSelected"
-                                   accept=".pkl,.plk"
-                                   class="form-control form-control-sm"
-                                   disabled="@_modelUploadInProgress" />
-
-                        @if (_modelUploadInProgress)
-                        {
-                            <div class="small text-info mt-2">Uploading model file...</div>
-                        }
-                        else if (!string.IsNullOrWhiteSpace(_modelUploadMessage))
-                        {
-                            <div class="small mt-2 @(_modelUploadIsError ? "text-danger" : "text-success")">
-                                @_modelUploadMessage
-                            </div>
-                        }
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 
-    <div class="card bg-dark border-secondary mb-4">
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h6 class="card-title mb-0">📜 Recent Logs (@_logs.Count)</h6>
-                <div class="btn-group btn-group-sm" role="group">
-                    <button type="button" class="btn @(_logFilter == "ALL" ? "btn-primary" : "btn-outline-secondary")" 
-                            @onclick='() => _logFilter = "ALL"'>All</button>
-                    <button type="button" class="btn @(_logFilter == "INFO" ? "btn-primary" : "btn-outline-secondary")" 
-                            @onclick='() => _logFilter = "INFO"'>Info</button>
-                    <button type="button" class="btn @(_logFilter == "WARNING" ? "btn-primary" : "btn-outline-secondary")" 
-                            @onclick='() => _logFilter = "WARNING"'>Warning</button>
-                    <button type="button" class="btn @(_logFilter == "ERROR" ? "btn-primary" : "btn-outline-secondary")" 
-                            @onclick='() => _logFilter = "ERROR"'>Error</button>
-                </div>
-            </div>
-            <div class="log-viewer">
-                @foreach (var log in GetFilteredLogs().TakeLast(50))
-                {
-                    <div class="log-entry log-@log.Level.ToLower()">
-                        <span class="log-time">@FormatTimestamp(log.Timestamp)</span>
-                        <span class="log-level badge bg-@GetLogLevelColor(log.Level)">@log.Level</span>
-                        <span class="log-logger text-muted">@log.Logger</span>
-                        <span class="log-message">@log.Message</span>
-                    </div>
-                }
-                @if (!GetFilteredLogs().Any())
-                {
-                    <div class="text-muted text-center py-3">No logs available</div>
-                }
-            </div>
-        </div>
-    </div>
 }
 
 @code {
     private PredictorStatus? _status;
-    private List<LogEntry> _logs = [];
-    private Timer? _refreshTimer;
-    private Timer? _countdownTimer;
-    private string _logFilter = "ALL";
-    private int _secondsUntilRefresh = 30;
     private Dictionary<string, double> _marketPrices = new();
-    private bool _modelUploadInProgress;
-    private string? _modelUploadMessage;
-    private bool _modelUploadIsError;
     private bool _initialLoadCompleted;
+    private BetProbabilityEntry? _betProbabilities;
 
     protected override async Task OnInitializedAsync()
     {
         await RefreshData();
-        _refreshTimer = new Timer(async _ => await InvokeAsync(async () =>
+        DataChangeNotifier.DataChanged += HandleDataChangedAsync;
+    }
+
+    private async Task HandleDataChangedAsync()
+    {
+        await InvokeAsync(async () =>
         {
             await RefreshData();
             StateHasChanged();
-        }), null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
-
-        _countdownTimer = new Timer(_ => InvokeAsync(() =>
-        {
-            _secondsUntilRefresh = _secondsUntilRefresh <= 1 ? 30 : _secondsUntilRefresh - 1;
-            StateHasChanged();
-        }), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        });
     }
 
     private async Task RefreshData()
     {
         _status = await StatusService.GetStatusAsync();
-        _logs = await LogService.GetRecentLogsAsync(100);
+        _betProbabilities = await BetProbabilityService.GetLatestAsync();
         _initialLoadCompleted = true;
-        _secondsUntilRefresh = 30;
 
         foreach (var tracking in _status?.ActiveTrackings ?? [])
         {
@@ -389,20 +393,6 @@ else
             }
         }
     }
-
-    private IEnumerable<LogEntry> GetFilteredLogs()
-    {
-        if (_logFilter == "ALL") return _logs;
-        return _logs.Where(l => l.Level == _logFilter);
-    }
-
-    private string GetLogLevelColor(string level) => level switch
-    {
-        "ERROR" => "danger",
-        "WARNING" => "warning",
-        "INFO" => "info",
-        _ => "secondary"
-    };
 
     private string FormatTimestamp(string iso8601)
     {
@@ -434,6 +424,11 @@ else
         if (!tracking.Target.HasValue || tracking.Target.Value == 0) return "—";
         var pct = Math.Min(100, (int)((double)tracking.TweetsInWindow / tracking.Target.Value * 100));
         return $"{pct}%";
+    }
+
+    private BetProbabilityTracking? GetBetProbability(string trackingId)
+    {
+        return _betProbabilities?.Trackings.FirstOrDefault(t => t.TrackingId == trackingId);
     }
 
     private (int Predicted, int Lower, int Upper, double ElapsedDays, double RemainingDays, double ObservedRate)? ComputeWindowPrediction(ActiveTracking tracking)
@@ -477,45 +472,8 @@ else
         return KellyCalculator.Calculate(lower, upper, target, marketPrice);
     }
 
-    private async Task OnModelFileSelected(InputFileChangeEventArgs e)
-    {
-        var file = e.File;
-        if (file is null)
-        {
-            return;
-        }
-
-        _modelUploadInProgress = true;
-        _modelUploadMessage = null;
-        _modelUploadIsError = false;
-
-        try
-        {
-            await using var stream = file.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024);
-            var result = await ModelFileService.ReplaceModelAsync(stream, file.Name);
-            _modelUploadIsError = !result.Success;
-            _modelUploadMessage = result.Message;
-
-            if (result.Success)
-            {
-                await RefreshData();
-            }
-        }
-        catch (Exception ex)
-        {
-            _modelUploadIsError = true;
-            _modelUploadMessage = $"Upload failed: {ex.Message}";
-        }
-        finally
-        {
-            _modelUploadInProgress = false;
-            await InvokeAsync(StateHasChanged);
-        }
-    }
-
     public void Dispose()
     {
-        _refreshTimer?.Dispose();
-        _countdownTimer?.Dispose();
+        DataChangeNotifier.DataChanged -= HandleDataChangedAsync;
     }
 }

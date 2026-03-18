@@ -26,8 +26,7 @@ public class ModelFileService : IModelFileService
         CancellationToken cancellationToken = default)
     {
         var extension = Path.GetExtension(originalFileName);
-        if (!string.Equals(extension, ".pkl", StringComparison.OrdinalIgnoreCase) &&
-            !string.Equals(extension, ".plk", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(extension, ".pkl", StringComparison.OrdinalIgnoreCase))
         {
             return (false, "Invalid file type. Please upload a .pkl file.");
         }

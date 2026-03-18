@@ -1,0 +1,105 @@
+@page "/log"
+@rendermode InteractiveServer
+@implements IDisposable
+@inject ILogService LogService
+@inject IDataChangeNotifier DataChangeNotifier
+
+<PageTitle>Logs</PageTitle>
+
+<div class="logs-page">
+    <div class="card bg-dark border-secondary logs-card">
+        <div class="card-body logs-card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3 logs-header">
+                <h6 class="card-title mb-0">📜 Recent Logs (@_logs.Count)</h6>
+                <div class="d-flex align-items-center gap-2">
+                <span class="small text-muted">Live updates enabled</span>
+                <div class="btn-group btn-group-sm" role="group">
+                    <button type="button" class="btn @(_logFilter == "ALL" ? "btn-primary" : "btn-outline-secondary")"
+                            @onclick='() => _logFilter = "ALL"'>All</button>
+                    <button type="button" class="btn @(_logFilter == "INFO" ? "btn-primary" : "btn-outline-secondary")"
+                            @onclick='() => _logFilter = "INFO"'>Info</button>
+                    <button type="button" class="btn @(_logFilter == "WARNING" ? "btn-primary" : "btn-outline-secondary")"
+                            @onclick='() => _logFilter = "WARNING"'>Warning</button>
+                    <button type="button" class="btn @(_logFilter == "ERROR" ? "btn-primary" : "btn-outline-secondary")"
+                            @onclick='() => _logFilter = "ERROR"'>Error</button>
+                </div>
+            </div>
+            </div>
+
+            <div class="log-viewer">
+                @foreach (var log in GetFilteredLogs().TakeLast(600).Reverse())
+                {
+                    <div class="log-entry log-@log.Level.ToLower()">
+                        <span class="log-time">@FormatTimestamp(log.Timestamp)</span>
+                        <span class="log-level badge bg-@GetLogLevelColor(log.Level)">@log.Level</span>
+                        <span class="log-logger text-muted">@log.Logger</span>
+                        <span class="log-message">@log.Message</span>
+                    </div>
+                }
+                @if (!GetFilteredLogs().Any())
+                {
+                    <div class="text-muted text-center py-3">No logs available</div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<LogEntry> _logs = [];
+    private string _logFilter = "ALL";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshLogsAsync();
+        DataChangeNotifier.DataChanged += HandleDataChangedAsync;
+    }
+
+    private async Task HandleDataChangedAsync()
+    {
+        await InvokeAsync(async () =>
+        {
+            await RefreshLogsAsync();
+            StateHasChanged();
+        });
+    }
+
+    private async Task RefreshLogsAsync()
+    {
+        _logs = await LogService.GetRecentLogsAsync(600);
+    }
+
+    private IEnumerable<LogEntry> GetFilteredLogs()
+    {
+        if (_logFilter == "ALL")
+        {
+            return _logs;
+        }
+
+        return _logs.Where(l => l.Level == _logFilter);
+    }
+
+    private string GetLogLevelColor(string level) => level switch
+    {
+        "ERROR" => "danger",
+        "WARNING" => "warning",
+        "INFO" => "info",
+        _ => "secondary"
+    };
+
+    private string FormatTimestamp(string iso8601)
+    {
+        if (DateTime.TryParse(iso8601, out var dt))
+        {
+            var local = dt.ToLocalTime();
+            return local.ToString("MMM dd HH:mm:ss");
+        }
+
+        return iso8601;
+    }
+
+    public void Dispose()
+    {
+        DataChangeNotifier.DataChanged -= HandleDataChangedAsync;
+    }
+}

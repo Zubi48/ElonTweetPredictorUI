@@ -1,0 +1,148 @@
+@page "/management"
+@rendermode InteractiveServer
+@implements IDisposable
+@inject IStatusService StatusService
+@inject IModelFileService ModelFileService
+@inject IDataChangeNotifier DataChangeNotifier
+
+<PageTitle>Management</PageTitle>
+
+@if (_status is null)
+{
+    <div class="alert alert-warning" role="alert">
+        Status data is not available yet. Management options will appear once <code>status.json</code> is available.
+    </div>
+}
+else
+{
+    <div class="card bg-dark border-secondary mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="card-title mb-0">⚙️ Management</h6>
+                <span class="small text-muted">Live updates enabled</span>
+            </div>
+
+            <h6 class="card-title mb-3">📁 Data Files</h6>
+            <table class="table table-sm table-dark table-borderless mb-0">
+                <tbody>
+                    <tr>
+                        <td class="text-muted">CSV</td>
+                        <td class="text-end"><code class="small">@Path.GetFileName(_status.Files.Csv)</code></td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Model</td>
+                        <td class="text-end"><code class="small">@Path.GetFileName(_status.Files.Model)</code></td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Log</td>
+                        <td class="text-end"><code class="small">@Path.GetFileName(_status.Files.Log)</code></td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Logs JSON</td>
+                        <td class="text-end"><code class="small">logs.json</code></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="mt-3 pt-3 border-top border-secondary-subtle">
+                <h6 class="mb-2">⬇️ Downloads</h6>
+                <div class="d-flex flex-wrap gap-2">
+                    <a class="btn btn-outline-info btn-sm" href="/downloads/csv">Download CSV</a>
+                    <a class="btn btn-outline-info btn-sm" href="/downloads/log">Download Log</a>
+                    <a class="btn btn-outline-info btn-sm" href="/downloads/logsjson">Download logs.json</a>
+                </div>
+            </div>
+
+            <div class="mt-3 pt-3 border-top border-secondary-subtle">
+                <h6 class="mb-2">🔁 Replace model file</h6>
+                <p class="small text-muted mb-2">
+                    Upload a new <code>.pkl</code> or <code>.pkg</code> file to replace <code>bayesian_model.pkl</code>.
+                    The UI will also write <code>reload.flag</code> so the Python service reloads it.
+                </p>
+                <InputFile OnChange="OnModelFileSelected"
+                           accept=".pkl,.plk,.pkg"
+                           class="form-control form-control-sm"
+                           disabled="@_modelUploadInProgress" />
+
+                @if (_modelUploadInProgress)
+                {
+                    <div class="small text-info mt-2">Uploading model file...</div>
+                }
+                else if (!string.IsNullOrWhiteSpace(_modelUploadMessage))
+                {
+                    <div class="small mt-2 @(_modelUploadIsError ? "text-danger" : "text-success")">
+                        @_modelUploadMessage
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private PredictorStatus? _status;
+    private bool _modelUploadInProgress;
+    private string? _modelUploadMessage;
+    private bool _modelUploadIsError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshStatusAsync();
+        DataChangeNotifier.DataChanged += HandleDataChangedAsync;
+    }
+
+    private async Task HandleDataChangedAsync()
+    {
+        await InvokeAsync(async () =>
+        {
+            await RefreshStatusAsync();
+            StateHasChanged();
+        });
+    }
+
+    private async Task RefreshStatusAsync()
+    {
+        _status = await StatusService.GetStatusAsync();
+    }
+
+    private async Task OnModelFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file is null)
+        {
+            return;
+        }
+
+        _modelUploadInProgress = true;
+        _modelUploadMessage = null;
+        _modelUploadIsError = false;
+
+        try
+        {
+            await using var stream = file.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024);
+            var result = await ModelFileService.ReplaceModelAsync(stream, file.Name);
+            _modelUploadIsError = !result.Success;
+            _modelUploadMessage = result.Message;
+
+            if (result.Success)
+            {
+                await RefreshStatusAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _modelUploadIsError = true;
+            _modelUploadMessage = $"Upload failed: {ex.Message}";
+        }
+        finally
+        {
+            _modelUploadInProgress = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public void Dispose()
+    {
+        DataChangeNotifier.DataChanged -= HandleDataChangedAsync;
+    }
+}

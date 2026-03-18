@@ -18,6 +18,9 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 builder.Services.AddSingleton<IStatusService, StatusService>();
 builder.Services.AddSingleton<ILogService, LogService>();
 builder.Services.AddSingleton<IModelFileService, ModelFileService>();
+builder.Services.AddSingleton<IBetProbabilityService, BetProbabilityService>();
+builder.Services.AddSingleton<IDataChangeNotifier, DataChangeNotifier>();
+builder.Services.AddSingleton<IDataFileService, DataFileService>();
 
 var app = builder.Build();
 
@@ -34,6 +37,17 @@ app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages:
 app.UseAntiforgery();
 
 app.MapStaticAssets();
+app.MapGet("/downloads/{fileType}", async (string fileType, IDataFileService dataFileService) =>
+{
+    var result = await dataFileService.ResolveAsync(fileType);
+    if (result is null)
+    {
+        return Results.NotFound();
+    }
+
+    return Results.File(result.FilePath, result.ContentType, result.DownloadFileName, enableRangeProcessing: true);
+});
+
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
