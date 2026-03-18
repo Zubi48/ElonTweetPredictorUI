@@ -9,12 +9,23 @@
 
 @if (_status is null)
 {
-    <div class="loading-container">
-        <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
+    if (!_initialLoadCompleted)
+    {
+        <div class="loading-container">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3 text-muted">Loading predictor data...</p>
         </div>
-        <p class="mt-3 text-muted">Loading predictor data...</p>
-    </div>
+    }
+    else
+    {
+        <div class="alert alert-warning" role="alert">
+            <h6 class="alert-heading mb-2">No predictor data available yet</h6>
+            <p class="mb-1">The UI is running, but it cannot find <code>status.json</code> in the shared data volume (<code>/app/data</code>).</p>
+            <p class="mb-0">Verify both containers are mounted to the same Docker volume (<code>elon-tweet-predictor-data</code>).</p>
+        </div>
+    }
 }
 else
 {
@@ -345,6 +356,7 @@ else
     private bool _modelUploadInProgress;
     private string? _modelUploadMessage;
     private bool _modelUploadIsError;
+    private bool _initialLoadCompleted;
 
     protected override async Task OnInitializedAsync()
     {
@@ -366,6 +378,7 @@ else
     {
         _status = await StatusService.GetStatusAsync();
         _logs = await LogService.GetRecentLogsAsync(100);
+        _initialLoadCompleted = true;
         _secondsUntilRefresh = 30;
 
         foreach (var tracking in _status?.ActiveTrackings ?? [])
