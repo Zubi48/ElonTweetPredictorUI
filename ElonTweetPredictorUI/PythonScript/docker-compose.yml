@@ -1,32 +1,18 @@
 services:
-  tweet-predictor:
-    build: .
-    container_name: elon-tweet-predictor
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=America/New_York
-      - DATA_DIR=/app/data
-    volumes:
-      - ./data:/app/data
-
   tweet-predictor-ui:
+    image: elon-tweet-predictor-ui:latest
     build:
       context: ..
       dockerfile: Dockerfile
     container_name: elon-tweet-predictor-ui
     restart: unless-stopped
-    depends_on:
-      - tweet-predictor
     environment:
       ASPNETCORE_URLS: http://0.0.0.0:8080
       ASPNETCORE_ENVIRONMENT: Production
       DataPath: /app/data
       TZ: America/New_York
     volumes:
-      - ./data:/app/data
+      - predictor-data:/app/data
     networks:
       - proxy
     labels:
@@ -41,3 +27,8 @@ services:
 networks:
   proxy:
     external: true
+
+volumes:
+  predictor-data:
+    external: true
+    name: elon-tweet-predictor-data

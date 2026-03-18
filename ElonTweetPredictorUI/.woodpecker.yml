@@ -1,0 +1,18 @@
+when:
+  event:
+    - push
+    - manual
+
+steps:
+  build_and_deploy_ui:
+    image: docker:27.3-cli
+    pull: true
+    privileged: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    commands:
+      - echo "Building and deploying UI container only..."
+      - docker version
+      - docker network create proxy || true
+      - docker volume create elon-tweet-predictor-data || true
+      - docker compose -f ElonTweetPredictorUI/PythonScript/docker-compose.yml up -d --build --force-recreate tweet-predictor-ui
