@@ -12,7 +12,7 @@ services:
       DataPath: /app/data
       TZ: America/New_York
     volumes:
-      - predictor-data:/app/data
+      - ${PREDICTOR_DATA_PATH:-/woodpecker/src/bitbucket.org/hardcodez/elontweetpredictor/data}:/app/data
     networks:
       - proxy
     labels:
@@ -27,8 +27,3 @@ services:
 networks:
   proxy:
     external: true
-
-volumes:
-  predictor-data:
-    external: true
-    name: elon-tweet-predictor-data

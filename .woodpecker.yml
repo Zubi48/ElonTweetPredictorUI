@@ -14,5 +14,4 @@ steps:
       - echo "Building and deploying UI container only..."
       - docker version
       - docker network create proxy || true
-      - docker volume create elon-tweet-predictor-data || true
       - docker compose -f ElonTweetPredictorUI/PythonScript/docker-compose.yml up -d --build --force-recreate tweet-predictor-ui
