@@ -21,6 +21,7 @@ builder.Services.AddSingleton<IModelFileService, ModelFileService>();
 builder.Services.AddSingleton<IBetProbabilityService, BetProbabilityService>();
 builder.Services.AddSingleton<IDataChangeNotifier, DataChangeNotifier>();
 builder.Services.AddSingleton<IDataFileService, DataFileService>();
+builder.Services.AddHostedService<LogConverterService>();
 
 var app = builder.Build();
 

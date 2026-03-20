@@ -21,20 +21,31 @@ public class DataFileService : IDataFileService
     public async Task<DataFileDownloadResult?> ResolveAsync(string fileType)
     {
         var normalized = fileType.Trim().ToLowerInvariant();
-        if (normalized is not ("csv" or "log" or "logsjson"))
+        if (normalized is not ("csv" or "log" or "predictorlog" or "logsjson"))
         {
             return null;
         }
 
-        if (normalized == "logsjson")
+        if (normalized == "predictorlog")
         {
-            var logsPath = Path.Combine(_dataPath, "logs.json");
-            if (!File.Exists(logsPath))
+            var logPath = Path.Combine(_dataPath, "tweet_predictor.log");
+            if (!File.Exists(logPath))
             {
                 return null;
             }
 
-            return new DataFileDownloadResult(logsPath, "application/json", "logs.json");
+            return new DataFileDownloadResult(logPath, "text/plain", "tweet_predictor.log");
+        }
+
+        if (normalized == "logsjson")
+        {
+            var logsJsonPath = Path.Combine(_dataPath, "logs.json");
+            if (!File.Exists(logsJsonPath))
+            {
+                return null;
+            }
+
+            return new DataFileDownloadResult(logsJsonPath, "application/json", "logs.json");
         }
 
         var status = await _statusService.GetStatusAsync();
@@ -56,7 +67,7 @@ public class DataFileService : IDataFileService
         var contentType = normalized switch
         {
             "csv" => "text/csv",
-            "log" => "application/json",
+            "log" => "text/plain",
             _ => "application/octet-stream"
         };
 
@@ -89,8 +100,8 @@ public class DataFileService : IDataFileService
 
     private string? ResolveFallbackLogPath()
     {
-        var logsPath = Path.Combine(_dataPath, "logs.json");
-        return File.Exists(logsPath) ? logsPath : null;
+        var logPath = Path.Combine(_dataPath, "tweet_predictor.log");
+        return File.Exists(logPath) ? logPath : null;
     }
 
     private string? ResolveFallbackCsvPath()

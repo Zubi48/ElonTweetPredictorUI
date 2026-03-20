@@ -26,6 +26,7 @@ public class PredictionInfo
     [JsonPropertyName("days_remaining")]        public int    DaysRemaining        { get; set; }
     [JsonPropertyName("posterior_mean")]        public double PosteriorMean        { get; set; }
     [JsonPropertyName("posterior_std")]         public double PosteriorStd         { get; set; }
+    [JsonPropertyName("pace")]                  public int?   Pace                 { get; set; }
 }
 
 public class ActiveTracking

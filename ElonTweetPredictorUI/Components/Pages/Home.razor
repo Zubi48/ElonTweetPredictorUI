@@ -22,8 +22,8 @@
     {
         <div class="alert alert-warning" role="alert">
             <h6 class="alert-heading mb-2">No predictor data available yet</h6>
-            <p class="mb-1">The UI is running, but it cannot find <code>status.json</code> in the shared data volume (<code>/app/data</code>).</p>
-            <p class="mb-0">Verify both containers are mounted to the same Docker volume (<code>elon-tweet-predictor-data</code>).</p>
+            <p class="mb-1">The UI is running, but it cannot find <code>tweet_predictor.log</code> in the shared data volume (<code>/app/data</code>).</p>
+                <p class="mb-0">Verify both containers are mounted to the same Docker volume (<code>elon-tweet-predictor-data</code>).</p>
         </div>
     }
 }
@@ -129,6 +129,19 @@ else
             </div>
         </div>
     </div>
+
+    @if (_status.Prediction.Pace.HasValue)
+    {
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="metric-label">Pace Projection</div>
+                    <div class="metric-value text-info">@_status.Prediction.Pace.Value.ToString("N0")</div>
+                    <div class="metric-sublabel">Based on current tweet rate</div>
+                </div>
+            </div>
+        </div>
+    }
 
     <div class="row g-3 mb-4">
         <div class="col-12">

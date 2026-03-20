@@ -58,8 +58,8 @@ public sealed class DataChangeNotifier : IDataChangeNotifier, IDisposable
     private static bool ShouldNotify(string? fileName)
     {
         return fileName is not null &&
-               (fileName.Equals("status.json", StringComparison.OrdinalIgnoreCase)
-                || fileName.Equals("logs.json", StringComparison.OrdinalIgnoreCase));
+               (fileName.Equals("status.json", StringComparison.OrdinalIgnoreCase) ||
+                fileName.Equals("logs.json", StringComparison.OrdinalIgnoreCase));
     }
 
     private void ScheduleNotification()

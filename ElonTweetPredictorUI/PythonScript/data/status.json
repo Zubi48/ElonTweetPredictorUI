@@ -1,30 +1,31 @@
 {
-  "updated_at": "2026-03-16T03:04:41.767815+00:00",
+  "updated_at": "2026-03-19T14:23:05.1230000",
   "state": "running",
-  "cumulative_count": 6583,
-  "tweets_this_week": 1,
+  "cumulative_count": 6693,
+  "tweets_this_week": 45,
   "prediction": {
-    "weekly_total": 0,
-    "bayesian_total": 0,
-    "ci_lower": 0,
-    "ci_upper": 0,
-    "event_factor": 0.0,
-    "event_adjustment_pct": 0.0,
-    "days_observed": 0,
-    "days_remaining": 7,
-    "posterior_mean": 0.0,
-    "posterior_std": 0.0
+    "weekly_total": 286,
+    "bayesian_total": 286,
+    "ci_lower": 120,
+    "ci_upper": 452,
+    "event_factor": 0,
+    "event_adjustment_pct": 0,
+    "days_observed": 2,
+    "days_remaining": 5,
+    "posterior_mean": 286.3,
+    "posterior_std": 238.6,
+    "pace": 315
   },
   "active_trackings": [],
   "model": {
-    "prior_mean": 288.9,
-    "prior_std": 239.53,
-    "training_weeks": 919,
-    "event_factor": 0.0
+    "prior_mean": 286.3,
+    "prior_std": 238.6,
+    "training_weeks": 1135,
+    "event_factor": 0
   },
   "files": {
-    "csv": "/app/data/elonmusk_tweet_history.csv",
-    "model": "/app/data/bayesian_model.pkl",
-    "log": "/app/data/tweet_predictor.log"
+    "csv": "PythonScript/data\\elonmusk_tweet_history.csv",
+    "model": "PythonScript/data\\bayesian_model.pkl",
+    "log": "PythonScript/data\\tweet_predictor.log"
   }
 }
