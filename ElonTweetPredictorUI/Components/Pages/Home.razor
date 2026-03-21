@@ -51,6 +51,7 @@ else
         <span><span class="text-muted">Predicted weekly:</span> <strong class="text-primary">@_status.Prediction.WeeklyTotal.ToString("N0")</strong> <span class="text-muted">[@_status.Prediction.CiLower–@_status.Prediction.CiUpper]</span></span>
     </div>
 
+    @if (_betProbabilities is not null && _betProbabilities.Trackings.Count > 0)
     {
         <div class="card bg-dark border-secondary mb-4">
             <div class="card-body">
