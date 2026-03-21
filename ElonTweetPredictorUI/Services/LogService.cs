@@ -37,7 +37,7 @@ public class LogService : ILogService
                 try
                 {
                     var entry = JsonSerializer.Deserialize<LogEntry>(line);
-                    if (entry is not null)
+                    if (entry is not null && !string.IsNullOrEmpty(entry.Message))
                         result.Add(entry);
                 }
                 catch (JsonException)

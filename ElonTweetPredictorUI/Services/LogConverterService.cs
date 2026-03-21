@@ -119,11 +119,15 @@ public sealed partial class LogConverterService : BackgroundService
 
             var status = BuildStatus(lines);
 
+            var betProbLines = CollectBetProbabilityLines(lines);
+
             await WriteAtomicAsync(_logsJsonPath, () =>
             {
                 var sb = new StringBuilder();
                 foreach (var entry in logEntries)
                     sb.AppendLine(JsonSerializer.Serialize(entry));
+                foreach (var raw in betProbLines)
+                    sb.AppendLine(raw);
                 return sb.ToString();
             });
 
@@ -154,6 +158,29 @@ public sealed partial class LogConverterService : BackgroundService
         foreach (var rawLine in lines)
         {
             var line = rawLine.TrimEnd('\r');
+
+            // Handle structured JSON log lines (new format from Python predictor)
+            if (line.StartsWith('{'))
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(line);
+                    var root = doc.RootElement;
+                    if (root.TryGetProperty("message", out var msgProp))
+                    {
+                        entries.Add(new LogEntry
+                        {
+                            Timestamp = root.TryGetProperty("timestamp", out var ts) ? ts.GetString() ?? "" : "",
+                            Level = root.TryGetProperty("level", out var lvl) ? lvl.GetString() ?? "" : "",
+                            Logger = root.TryGetProperty("logger", out var lgr) ? lgr.GetString() ?? "" : "",
+                            Message = msgProp.GetString() ?? ""
+                        });
+                    }
+                }
+                catch (JsonException) { }
+                continue;
+            }
+
             var match = LogLineRegex().Match(line);
             if (!match.Success)
                 continue;
@@ -192,6 +219,85 @@ public sealed partial class LogConverterService : BackgroundService
 
         bool foundPrediction = false, foundModel = false, foundCumulative = false, foundTimestamp = false;
 
+        // Try parsing structured JSON poll_snapshot lines first (newest log format)
+        for (var i = lines.Length - 1; i >= 0; i--)
+        {
+            var line = lines[i].TrimEnd('\r');
+            if (!line.StartsWith('{') || !line.Contains("\"poll_snapshot\""))
+                continue;
+
+            try
+            {
+                using var doc = JsonDocument.Parse(line);
+                var root = doc.RootElement;
+                if (!root.TryGetProperty("type", out var typeProp) || typeProp.GetString() != "poll_snapshot")
+                    continue;
+
+                if (root.TryGetProperty("timestamp", out var ts))
+                {
+                    status.UpdatedAt = ts.GetString() ?? "";
+                    foundTimestamp = true;
+                }
+
+                if (root.TryGetProperty("cumulative_count", out var cc))
+                {
+                    status.CumulativeCount = cc.GetInt32();
+                    foundCumulative = true;
+                }
+
+                if (root.TryGetProperty("tweets_this_week", out var tw))
+                    status.TweetsThisWeek = tw.GetInt32();
+
+                if (root.TryGetProperty("pace_projected", out var pace))
+                    status.Prediction.Pace = pace.GetInt32();
+
+                if (root.TryGetProperty("prediction", out var pred))
+                {
+                    if (pred.TryGetProperty("predicted_weekly_total", out var pwt))
+                        status.Prediction.WeeklyTotal = pwt.GetInt32();
+                    if (pred.TryGetProperty("bayesian_weekly_total", out var bwt))
+                        status.Prediction.BayesianTotal = bwt.GetInt32();
+                    if (pred.TryGetProperty("adjusted_ci_95_lower", out var cil))
+                        status.Prediction.CiLower = cil.GetInt32();
+                    if (pred.TryGetProperty("adjusted_ci_95_upper", out var ciu))
+                        status.Prediction.CiUpper = ciu.GetInt32();
+                    if (pred.TryGetProperty("event_factor", out var ef))
+                        status.Prediction.EventFactor = ef.GetDouble();
+                    if (pred.TryGetProperty("event_adjustment_pct", out var eap))
+                        status.Prediction.EventAdjustmentPct = eap.GetDouble();
+                    if (pred.TryGetProperty("days_observed", out var dobs))
+                        status.Prediction.DaysObserved = dobs.GetInt32();
+                    if (pred.TryGetProperty("days_remaining", out var drem))
+                        status.Prediction.DaysRemaining = drem.GetInt32();
+                    if (pred.TryGetProperty("posterior_mean", out var pm))
+                        status.Prediction.PosteriorMean = pm.GetDouble();
+                    if (pred.TryGetProperty("posterior_std", out var ps))
+                        status.Prediction.PosteriorStd = ps.GetDouble();
+
+                    foundPrediction = true;
+                }
+
+                if (root.TryGetProperty("active_trackings", out var trackings) && trackings.ValueKind == JsonValueKind.Array)
+                {
+                    status.ActiveTrackings = [];
+                    foreach (var t in trackings.EnumerateArray())
+                    {
+                        status.ActiveTrackings.Add(new ActiveTracking
+                        {
+                            Id = t.TryGetProperty("id", out var id) ? id.GetString() ?? "" : "",
+                            Title = t.TryGetProperty("title", out var title) ? title.GetString() ?? "" : "",
+                            Target = t.TryGetProperty("target", out var target) && target.ValueKind == JsonValueKind.Number ? target.GetInt32() : null,
+                            TweetsInWindow = t.TryGetProperty("tweets_in_window", out var tiw) ? tiw.GetInt32() : 0
+                        });
+                    }
+                }
+
+                break;
+            }
+            catch (JsonException) { }
+        }
+
+        // Fall back to text-based parsing for fields not found in JSON
         for (var i = lines.Length - 1; i >= 0; i--)
         {
             var line = lines[i].TrimEnd('\r');
@@ -297,6 +403,18 @@ public sealed partial class LogConverterService : BackgroundService
         }
 
         return status;
+    }
+
+    private static List<string> CollectBetProbabilityLines(string[] lines)
+    {
+        var result = new List<string>();
+        foreach (var rawLine in lines)
+        {
+            var line = rawLine.TrimEnd('\r');
+            if (line.StartsWith('{') && line.Contains("\"bet_probabilities\""))
+                result.Add(line);
+        }
+        return result;
     }
 
     private static async Task WriteAtomicAsync(string targetPath, Func<string> generateContent)

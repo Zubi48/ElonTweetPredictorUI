@@ -1,26 +1,51 @@
 {
-  "updated_at": "2026-03-19T14:23:05.1230000",
+  "updated_at": "2026-03-21T00:28:25.507984\u002B00:00",
   "state": "running",
-  "cumulative_count": 6693,
-  "tweets_this_week": 45,
+  "cumulative_count": 6842,
+  "tweets_this_week": 152,
   "prediction": {
     "weekly_total": 286,
     "bayesian_total": 286,
-    "ci_lower": 120,
-    "ci_upper": 452,
+    "ci_lower": 0,
+    "ci_upper": 753,
     "event_factor": 0,
     "event_adjustment_pct": 0,
-    "days_observed": 2,
-    "days_remaining": 5,
-    "posterior_mean": 286.3,
-    "posterior_std": 238.6,
-    "pace": 315
+    "days_observed": 0,
+    "days_remaining": 7,
+    "posterior_mean": 285.7,
+    "posterior_std": 238.2,
+    "pace": 1216
   },
-  "active_trackings": [],
+  "active_trackings": [
+    {
+      "id": "d861bacb-6108-45d6-9a14-47b9e58ea095",
+      "title": "Elon Musk # tweets March 20 - March 27, 2026?",
+      "target": null,
+      "startDate": "",
+      "endDate": "",
+      "tweets_in_window": 8
+    },
+    {
+      "id": "2446ea0e-e759-40e1-8f28-cf2986c426c8",
+      "title": "Elon Musk # tweets March 17 - March 24, 2026?",
+      "target": null,
+      "startDate": "",
+      "endDate": "",
+      "tweets_in_window": 202
+    },
+    {
+      "id": "a7d58673-3a50-4904-a81f-bde5688177d9",
+      "title": "Elon Musk # tweets March 21 - March 23, 2026?",
+      "target": null,
+      "startDate": "",
+      "endDate": "",
+      "tweets_in_window": 0
+    }
+  ],
   "model": {
-    "prior_mean": 286.3,
-    "prior_std": 238.6,
-    "training_weeks": 1135,
+    "prior_mean": 285.7,
+    "prior_std": 238.2,
+    "training_weeks": 1208,
     "event_factor": 0
   },
   "files": {
