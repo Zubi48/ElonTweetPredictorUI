@@ -46,6 +46,62 @@ public sealed partial class LogConverterService : BackgroundService
     [GeneratedRegex(@"Model loaded.*EventFactor=(\d+\.?\d*)")]
     private static partial Regex ModelLoadedRegex();
 
+    // Day-of-week: Monday    │ ████   12.4%  (851 tweets)
+    [GeneratedRegex(@"(\w+day)\s+│.*?(\d+\.?\d*)%\s+\((\d+)\s+tweets?\)")]
+    private static partial Regex DayOfWeekRegex();
+
+    // Hourly: 00:00 │ ▪▪▪ 499
+    [GeneratedRegex(@"(\d{2}:\d{2})\s+│.*\s(\d+)\s*$")]
+    private static partial Regex HourlyRegex();
+
+    // ► Peak hour (EST): 00:00
+    [GeneratedRegex(@"Peak hour.*?:\s+(\d{2}:\d{2})")]
+    private static partial Regex PeakHourRegex();
+
+    // Gap statistics
+    [GeneratedRegex(@"Mean gap\s+:\s+(\d+\.?\d*)\s+hours")]
+    private static partial Regex MeanGapRegex();
+
+    [GeneratedRegex(@"Median gap\s+:\s+(\d+\.?\d*)\s+hours")]
+    private static partial Regex MedianGapRegex();
+
+    [GeneratedRegex(@"Max gap.*?:\s+(\d+\.?\d*)\s+hours")]
+    private static partial Regex MaxGapRegex();
+
+    [GeneratedRegex(@"Std dev.*?:\s+(\d+\.?\d*)\s+hours")]
+    private static partial Regex StdDevGapRegex();
+
+    [GeneratedRegex(@"Unusually long.*?:\s+(\d+)\s+occurrences")]
+    private static partial Regex UnusuallyLongRegex();
+
+    // Weekly: 2025-W01 │ 291 tweets
+    [GeneratedRegex(@"(\d{4}-W\d{2})\s+│\s+(\d+)\s+tweets")]
+    private static partial Regex WeeklySummaryRegex();
+
+    // Weekly aggregate: Mean: 311.3  |  Std: 114.9  |  Min: 30  |  Max: 597
+    [GeneratedRegex(@"Mean:\s+(\d+\.?\d*)\s+\|\s+Std:\s+(\d+\.?\d*)\s+\|\s+Min:\s+(\d+)\s+\|\s+Max:\s+(\d+)")]
+    private static partial Regex WeeklyAggregateRegex();
+
+    // Bet title: 📌 [1/4]  Elon Musk # tweets March 24 - March 31, 2026?
+    [GeneratedRegex(@"📌\s+\[\d+/\d+\]\s+(.+)")]
+    private static partial Regex BetTitleRegex();
+
+    // Time remaining: ⏳ Time Remaining  : 10d 9h 58m
+    [GeneratedRegex(@"Time Remaining\s+:\s+(.+?)(?:\s*$)")]
+    private static partial Regex TimeRemainingRegex();
+
+    // Tweets in window: ✅ Tweets in Window: 0
+    [GeneratedRegex(@"Tweets in Window:\s+(\d+)")]
+    private static partial Regex BetTweetsInWindowRegex();
+
+    // Predicted total: 🔮 Predicted Total : 27  [95% CI: 0 – 116]  σ≈29.6
+    [GeneratedRegex(@"Predicted Total\s+:\s+(\d+)\s+\[95%\s*CI:\s*(\d+)\s*[–—-]\s*(\d+)\]\s+σ[≈=](\d+\.?\d*)")]
+    private static partial Regex PredictedTotalRegex();
+
+    // Interval row: <20  40.0%  or  20-39  26.4%
+    [GeneratedRegex(@"(<?\d+(?:-\d+)?)\s+(\d+\.?\d*)%")]
+    private static partial Regex IntervalRowRegex();
+
     public LogConverterService(IConfiguration configuration, ILogger<LogConverterService> logger)
     {
         _dataPath = configuration["DataPath"] ?? ".";
@@ -402,7 +458,213 @@ public sealed partial class LogConverterService : BackgroundService
                 status.Files.Csv = csvFile;
         }
 
+        status.TemporalPatterns = ParseTemporalPatterns(lines);
+        status.BetIntervalForecasts = ParseBetIntervalForecasts(lines);
+
         return status;
+    }
+
+    private static TemporalPatterns ParseTemporalPatterns(string[] lines)
+    {
+        var patterns = new TemporalPatterns();
+
+        // Day-of-Week Distribution — find last occurrence
+        for (var i = lines.Length - 1; i >= 0; i--)
+        {
+            if (!lines[i].Contains("Day-of-Week Distribution"))
+                continue;
+
+            for (var j = i + 1; j < lines.Length; j++)
+            {
+                var line = lines[j].TrimEnd('\r');
+                var m = DayOfWeekRegex().Match(line);
+                if (m.Success)
+                {
+                    patterns.DayOfWeek.Add(new DayOfWeekEntry
+                    {
+                        Day = m.Groups[1].Value,
+                        Percentage = double.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture),
+                        Count = int.Parse(m.Groups[3].Value)
+                    });
+                }
+                else if (patterns.DayOfWeek.Count > 0)
+                    break;
+            }
+            break;
+        }
+
+        // Hourly Distribution — find last occurrence
+        for (var i = lines.Length - 1; i >= 0; i--)
+        {
+            if (!lines[i].Contains("Hourly Distribution"))
+                continue;
+
+            for (var j = i + 1; j < lines.Length; j++)
+            {
+                var line = lines[j].TrimEnd('\r');
+
+                var peakMatch = PeakHourRegex().Match(line);
+                if (peakMatch.Success)
+                {
+                    patterns.PeakHour = peakMatch.Groups[1].Value;
+                    break;
+                }
+
+                var m = HourlyRegex().Match(line);
+                if (m.Success)
+                {
+                    patterns.Hourly.Add(new HourlyEntry
+                    {
+                        Hour = m.Groups[1].Value,
+                        Count = int.Parse(m.Groups[2].Value)
+                    });
+                }
+            }
+            break;
+        }
+
+        // Inactivity Gap Statistics — find last occurrence
+        for (var i = lines.Length - 1; i >= 0; i--)
+        {
+            if (!lines[i].Contains("Inactivity Gap Statistics"))
+                continue;
+
+            for (var j = i + 1; j < lines.Length && j < i + 15; j++)
+            {
+                var line = lines[j].TrimEnd('\r');
+                var meanM = MeanGapRegex().Match(line);
+                if (meanM.Success) { patterns.InactivityGap.MeanHours = double.Parse(meanM.Groups[1].Value, CultureInfo.InvariantCulture); continue; }
+                var medM = MedianGapRegex().Match(line);
+                if (medM.Success) { patterns.InactivityGap.MedianHours = double.Parse(medM.Groups[1].Value, CultureInfo.InvariantCulture); continue; }
+                var maxM = MaxGapRegex().Match(line);
+                if (maxM.Success) { patterns.InactivityGap.MaxHours = double.Parse(maxM.Groups[1].Value, CultureInfo.InvariantCulture); continue; }
+                var stdM = StdDevGapRegex().Match(line);
+                if (stdM.Success) { patterns.InactivityGap.StdDevHours = double.Parse(stdM.Groups[1].Value, CultureInfo.InvariantCulture); continue; }
+                var ulM = UnusuallyLongRegex().Match(line);
+                if (ulM.Success) { patterns.InactivityGap.UnusuallyLongCount = int.Parse(ulM.Groups[1].Value); break; }
+            }
+            break;
+        }
+
+        // Weekly Tweet Summary — find last occurrence
+        for (var i = lines.Length - 1; i >= 0; i--)
+        {
+            if (!lines[i].Contains("Weekly Tweet Summary"))
+                continue;
+
+            for (var j = i + 1; j < lines.Length; j++)
+            {
+                var line = lines[j].TrimEnd('\r');
+
+                var aggM = WeeklyAggregateRegex().Match(line);
+                if (aggM.Success)
+                {
+                    patterns.WeeklyMean = double.Parse(aggM.Groups[1].Value, CultureInfo.InvariantCulture);
+                    patterns.WeeklyStd = double.Parse(aggM.Groups[2].Value, CultureInfo.InvariantCulture);
+                    patterns.WeeklyMin = int.Parse(aggM.Groups[3].Value);
+                    patterns.WeeklyMax = int.Parse(aggM.Groups[4].Value);
+                    break;
+                }
+
+                var wm = WeeklySummaryRegex().Match(line);
+                if (wm.Success)
+                {
+                    patterns.WeeklySummary.Add(new WeeklySummaryEntry
+                    {
+                        Week = wm.Groups[1].Value,
+                        Count = int.Parse(wm.Groups[2].Value)
+                    });
+                }
+            }
+            break;
+        }
+
+        return patterns;
+    }
+
+    private static List<BetIntervalForecast> ParseBetIntervalForecasts(string[] lines)
+    {
+        var result = new List<BetIntervalForecast>();
+
+        // Find last "BET ANSWER INTERVAL PROBABILITIES" block
+        int startIdx = -1;
+        for (var i = lines.Length - 1; i >= 0; i--)
+        {
+            if (lines[i].Contains("BET ANSWER INTERVAL PROBABILITIES"))
+            {
+                startIdx = i;
+                break;
+            }
+        }
+
+        if (startIdx < 0)
+            return result;
+
+        BetIntervalForecast? current = null;
+        bool inIntervals = false;
+
+        for (var i = startIdx + 1; i < lines.Length; i++)
+        {
+            var line = lines[i].TrimEnd('\r');
+
+            // End of entire block — closing ====== after at least one market
+            if (line.Contains("======") && result.Count > 0)
+                break;
+
+            var titleMatch = BetTitleRegex().Match(line);
+            if (titleMatch.Success)
+            {
+                current = new BetIntervalForecast { Title = titleMatch.Groups[1].Value.Trim() };
+                result.Add(current);
+                inIntervals = false;
+                continue;
+            }
+
+            if (current is null)
+                continue;
+
+            var trMatch = TimeRemainingRegex().Match(line);
+            if (trMatch.Success) { current.TimeRemaining = trMatch.Groups[1].Value.Trim(); continue; }
+
+            var twMatch = BetTweetsInWindowRegex().Match(line);
+            if (twMatch.Success) { current.TweetsInWindow = int.Parse(twMatch.Groups[1].Value); continue; }
+
+            var ptMatch = PredictedTotalRegex().Match(line);
+            if (ptMatch.Success)
+            {
+                current.PredictedTotal = int.Parse(ptMatch.Groups[1].Value);
+                current.CiLower = int.Parse(ptMatch.Groups[2].Value);
+                current.CiUpper = int.Parse(ptMatch.Groups[3].Value);
+                current.Sigma = double.Parse(ptMatch.Groups[4].Value, CultureInfo.InvariantCulture);
+                continue;
+            }
+
+            // Detect interval table boundaries (─── separator lines)
+            if (line.Contains("───"))
+            {
+                if (inIntervals)
+                    inIntervals = false; // End of interval rows
+                else
+                    inIntervals = true;  // Start of interval rows
+                continue;
+            }
+
+            if (inIntervals)
+            {
+                var intMatch = IntervalRowRegex().Match(line);
+                if (intMatch.Success)
+                {
+                    current.Intervals.Add(new IntervalProbability
+                    {
+                        Label = intMatch.Groups[1].Value,
+                        Probability = double.Parse(intMatch.Groups[2].Value, CultureInfo.InvariantCulture),
+                        IsPredicted = line.Contains('◄')
+                    });
+                }
+            }
+        }
+
+        return result;
     }
 
     private static List<string> CollectBetProbabilityLines(string[] lines)

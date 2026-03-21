@@ -1,56 +1,426 @@
 {
-  "updated_at": "2026-03-21T00:28:25.507984\u002B00:00",
+  "updated_at": "2026-03-21T02:01:26.2820000",
   "state": "running",
-  "cumulative_count": 6842,
-  "tweets_this_week": 152,
+  "cumulative_count": 0,
+  "tweets_this_week": 0,
   "prediction": {
-    "weekly_total": 286,
-    "bayesian_total": 286,
+    "weekly_total": 0,
+    "bayesian_total": 0,
     "ci_lower": 0,
-    "ci_upper": 753,
+    "ci_upper": 0,
     "event_factor": 0,
     "event_adjustment_pct": 0,
     "days_observed": 0,
-    "days_remaining": 7,
-    "posterior_mean": 285.7,
-    "posterior_std": 238.2,
-    "pace": 1216
+    "days_remaining": 0,
+    "posterior_mean": 283.9,
+    "posterior_std": 237.2,
+    "pace": null
   },
-  "active_trackings": [
-    {
-      "id": "d861bacb-6108-45d6-9a14-47b9e58ea095",
-      "title": "Elon Musk # tweets March 20 - March 27, 2026?",
-      "target": null,
-      "startDate": "",
-      "endDate": "",
-      "tweets_in_window": 8
-    },
-    {
-      "id": "2446ea0e-e759-40e1-8f28-cf2986c426c8",
-      "title": "Elon Musk # tweets March 17 - March 24, 2026?",
-      "target": null,
-      "startDate": "",
-      "endDate": "",
-      "tweets_in_window": 202
-    },
-    {
-      "id": "a7d58673-3a50-4904-a81f-bde5688177d9",
-      "title": "Elon Musk # tweets March 21 - March 23, 2026?",
-      "target": null,
-      "startDate": "",
-      "endDate": "",
-      "tweets_in_window": 0
-    }
-  ],
+  "active_trackings": [],
   "model": {
-    "prior_mean": 285.7,
-    "prior_std": 238.2,
-    "training_weeks": 1208,
+    "prior_mean": 283.9,
+    "prior_std": 237.2,
+    "training_weeks": 1500,
     "event_factor": 0
   },
   "files": {
     "csv": "PythonScript/data\\elonmusk_tweet_history.csv",
     "model": "PythonScript/data\\bayesian_model.pkl",
     "log": "PythonScript/data\\tweet_predictor.log"
-  }
+  },
+  "temporal_patterns": {
+    "day_of_week": [
+      {
+        "day": "Monday",
+        "percentage": 12.4,
+        "count": 851
+      },
+      {
+        "day": "Tuesday",
+        "percentage": 15,
+        "count": 1024
+      },
+      {
+        "day": "Wednesday",
+        "percentage": 14.9,
+        "count": 1023
+      },
+      {
+        "day": "Thursday",
+        "percentage": 15.7,
+        "count": 1075
+      },
+      {
+        "day": "Friday",
+        "percentage": 15.4,
+        "count": 1056
+      },
+      {
+        "day": "Saturday",
+        "percentage": 13,
+        "count": 890
+      },
+      {
+        "day": "Sunday",
+        "percentage": 13.6,
+        "count": 930
+      }
+    ],
+    "hourly": [
+      {
+        "hour": "00:00",
+        "count": 499
+      },
+      {
+        "hour": "01:00",
+        "count": 498
+      },
+      {
+        "hour": "02:00",
+        "count": 419
+      },
+      {
+        "hour": "03:00",
+        "count": 420
+      },
+      {
+        "hour": "04:00",
+        "count": 197
+      },
+      {
+        "hour": "05:00",
+        "count": 118
+      },
+      {
+        "hour": "06:00",
+        "count": 136
+      },
+      {
+        "hour": "07:00",
+        "count": 228
+      },
+      {
+        "hour": "08:00",
+        "count": 340
+      },
+      {
+        "hour": "09:00",
+        "count": 486
+      },
+      {
+        "hour": "10:00",
+        "count": 374
+      },
+      {
+        "hour": "11:00",
+        "count": 351
+      },
+      {
+        "hour": "12:00",
+        "count": 370
+      },
+      {
+        "hour": "13:00",
+        "count": 355
+      },
+      {
+        "hour": "14:00",
+        "count": 352
+      },
+      {
+        "hour": "15:00",
+        "count": 280
+      },
+      {
+        "hour": "16:00",
+        "count": 199
+      },
+      {
+        "hour": "17:00",
+        "count": 155
+      },
+      {
+        "hour": "18:00",
+        "count": 206
+      },
+      {
+        "hour": "19:00",
+        "count": 224
+      },
+      {
+        "hour": "20:00",
+        "count": 197
+      },
+      {
+        "hour": "21:00",
+        "count": 116
+      },
+      {
+        "hour": "22:00",
+        "count": 144
+      },
+      {
+        "hour": "23:00",
+        "count": 185
+      }
+    ],
+    "peak_hour": "00:00",
+    "inactivity_gap": {
+      "mean_hours": 0.49,
+      "median_hours": 0.05,
+      "max_hours": 17.69,
+      "std_dev_hours": 1.35,
+      "unusually_long_count": 314
+    },
+    "weekly_summary": [
+      {
+        "week": "2025-W01",
+        "count": 291
+      },
+      {
+        "week": "2025-W44",
+        "count": 30
+      },
+      {
+        "week": "2025-W45",
+        "count": 169
+      },
+      {
+        "week": "2025-W46",
+        "count": 264
+      },
+      {
+        "week": "2025-W47",
+        "count": 175
+      },
+      {
+        "week": "2025-W48",
+        "count": 285
+      },
+      {
+        "week": "2025-W49",
+        "count": 384
+      },
+      {
+        "week": "2025-W50",
+        "count": 295
+      },
+      {
+        "week": "2025-W51",
+        "count": 338
+      },
+      {
+        "week": "2025-W52",
+        "count": 346
+      },
+      {
+        "week": "2026-W01",
+        "count": 280
+      },
+      {
+        "week": "2026-W02",
+        "count": 597
+      },
+      {
+        "week": "2026-W03",
+        "count": 512
+      },
+      {
+        "week": "2026-W04",
+        "count": 415
+      },
+      {
+        "week": "2026-W05",
+        "count": 365
+      },
+      {
+        "week": "2026-W06",
+        "count": 263
+      },
+      {
+        "week": "2026-W07",
+        "count": 358
+      },
+      {
+        "week": "2026-W08",
+        "count": 345
+      },
+      {
+        "week": "2026-W09",
+        "count": 247
+      },
+      {
+        "week": "2026-W10",
+        "count": 312
+      },
+      {
+        "week": "2026-W11",
+        "count": 315
+      },
+      {
+        "week": "2026-W12",
+        "count": 263
+      }
+    ],
+    "weekly_mean": 311.3,
+    "weekly_std": 114.9,
+    "weekly_min": 30,
+    "weekly_max": 597
+  },
+  "bet_interval_forecasts": [
+    {
+      "title": "Elon Musk # tweets March 24 - March 31, 2026?",
+      "time_remaining": "10d 9h 58m",
+      "tweets_in_window": 0,
+      "predicted_total": 27,
+      "ci_lower": 0,
+      "ci_upper": 116,
+      "sigma": 29.6,
+      "intervals": [
+        {
+          "label": "\u003C20",
+          "probability": 40,
+          "is_predicted": false
+        },
+        {
+          "label": "20-39",
+          "probability": 26.4,
+          "is_predicted": true
+        },
+        {
+          "label": "40-59",
+          "probability": 20,
+          "is_predicted": false
+        },
+        {
+          "label": "60-79",
+          "probability": 9.8,
+          "is_predicted": false
+        },
+        {
+          "label": "80-99",
+          "probability": 3.1,
+          "is_predicted": false
+        },
+        {
+          "label": "100-119",
+          "probability": 0.6,
+          "is_predicted": false
+        }
+      ]
+    },
+    {
+      "title": "Elon Musk # tweets March 20 - March 27, 2026?",
+      "time_remaining": "6d 9h 58m",
+      "tweets_in_window": 15,
+      "predicted_total": 44,
+      "ci_lower": 15,
+      "ci_upper": 111,
+      "sigma": 24.5,
+      "intervals": [
+        {
+          "label": "\u003C20",
+          "probability": 15.9,
+          "is_predicted": false
+        },
+        {
+          "label": "20-39",
+          "probability": 26.9,
+          "is_predicted": false
+        },
+        {
+          "label": "40-59",
+          "probability": 31,
+          "is_predicted": true
+        },
+        {
+          "label": "60-79",
+          "probability": 19,
+          "is_predicted": false
+        },
+        {
+          "label": "80-99",
+          "probability": 6.2,
+          "is_predicted": false
+        },
+        {
+          "label": "100-119",
+          "probability": 1.1,
+          "is_predicted": false
+        }
+      ]
+    },
+    {
+      "title": "Elon Musk # tweets March 17 - March 24, 2026?",
+      "time_remaining": "3d 9h 59m",
+      "tweets_in_window": 209,
+      "predicted_total": 315,
+      "ci_lower": 277,
+      "ci_upper": 353,
+      "sigma": 19.4,
+      "intervals": [
+        {
+          "label": "260-279",
+          "probability": 3.2,
+          "is_predicted": false
+        },
+        {
+          "label": "280-299",
+          "probability": 18.1,
+          "is_predicted": false
+        },
+        {
+          "label": "300-319",
+          "probability": 38.5,
+          "is_predicted": true
+        },
+        {
+          "label": "320-339",
+          "probability": 30.9,
+          "is_predicted": false
+        },
+        {
+          "label": "340-359",
+          "probability": 9.4,
+          "is_predicted": false
+        }
+      ]
+    },
+    {
+      "title": "Elon Musk # tweets March 21 - March 23, 2026?",
+      "time_remaining": "2d 9h 58m",
+      "tweets_in_window": 0,
+      "predicted_total": 6,
+      "ci_lower": 0,
+      "ci_upper": 86,
+      "sigma": 21.9,
+      "intervals": [
+        {
+          "label": "\u003C20",
+          "probability": 73.1,
+          "is_predicted": true
+        },
+        {
+          "label": "20-39",
+          "probability": 20.6,
+          "is_predicted": false
+        },
+        {
+          "label": "40-59",
+          "probability": 5.6,
+          "is_predicted": false
+        },
+        {
+          "label": "60-79",
+          "probability": 0.7,
+          "is_predicted": false
+        },
+        {
+          "label": "80-99",
+          "probability": 0,
+          "is_predicted": false
+        }
+      ]
+    }
+  ]
 }

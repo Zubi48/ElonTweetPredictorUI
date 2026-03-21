@@ -51,6 +51,38 @@ else
         <span><span class="text-muted">Predicted weekly:</span> <strong class="text-primary">@_status.Prediction.WeeklyTotal.ToString("N0")</strong> <span class="text-muted">[@_status.Prediction.CiLower–@_status.Prediction.CiUpper]</span></span>
     </div>
 
+    @if (_status.TemporalPatterns.WeeklySummary.Count > 0)
+    {
+        <div class="card bg-dark border-secondary mb-4">
+            <div class="card-body">
+                <h6 class="card-title mb-3">
+                    📈 Weekly Tweet Summary
+                    <span class="small text-muted ms-2">
+                        Mean: @_status.TemporalPatterns.WeeklyMean.ToString("F1") |
+                        Std: @_status.TemporalPatterns.WeeklyStd.ToString("F1") |
+                        Min: @_status.TemporalPatterns.WeeklyMin |
+                        Max: @_status.TemporalPatterns.WeeklyMax
+                    </span>
+                </h6>
+                @{ var maxWeekly = _status.TemporalPatterns.WeeklySummary.Max(w => w.Count); }
+                <div class="d-flex flex-wrap gap-1">
+                    @foreach (var week in _status.TemporalPatterns.WeeklySummary)
+                    {
+                        var weekPct = maxWeekly > 0 ? (100.0 * week.Count / maxWeekly) : 0;
+                        <div class="text-center" style="flex: 1; min-width: 38px; max-width: 60px;">
+                            <div style="height: 60px; display: flex; align-items: flex-end; justify-content: center;">
+                                <div class="@(week.Count == maxWeekly ? "bg-info" : week.Count == _status.TemporalPatterns.WeeklyMin ? "bg-warning" : "bg-secondary")"
+                                     style="width: 100%; height: @weekPct.ToString("F0", System.Globalization.CultureInfo.InvariantCulture)%; border-radius: 3px 3px 0 0; min-height: 2px;"></div>
+                            </div>
+                            <div class="text-muted" style="font-size: 0.6rem; line-height: 1.1; margin-top: 2px;">@week.Week.Replace("20", "")[1..]</div>
+                            <div class="small fw-semibold" style="font-size: 0.65rem;">@week.Count</div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
     @if (_betProbabilities is not null && _betProbabilities.Trackings.Count > 0)
     {
         <div class="card bg-dark border-secondary mb-4">
@@ -145,9 +177,145 @@ else
                 </div>
             </div>
         </div>
+
+        @if (_status.TemporalPatterns.InactivityGap.MaxHours > 0)
+        {
+            <div class="col-lg-6">
+                <div class="card bg-dark border-secondary">
+                    <div class="card-body">
+                        <h6 class="card-title mb-3">⏸️ Inactivity Gap Statistics</h6>
+                        <table class="table table-sm table-dark table-borderless mb-0">
+                            <tbody>
+                                <tr>
+                                    <td class="text-muted">Mean Gap</td>
+                                    <td class="text-end"><strong>@_status.TemporalPatterns.InactivityGap.MeanHours.ToString("F2") hrs</strong></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Median Gap</td>
+                                    <td class="text-end"><strong>@_status.TemporalPatterns.InactivityGap.MedianHours.ToString("F2") hrs</strong></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Max Gap</td>
+                                    <td class="text-end"><strong>@_status.TemporalPatterns.InactivityGap.MaxHours.ToString("F2") hrs</strong></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Std Dev</td>
+                                    <td class="text-end"><strong>@_status.TemporalPatterns.InactivityGap.StdDevHours.ToString("F2") hrs</strong></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Unusually Long</td>
+                                    <td class="text-end"><strong>@_status.TemporalPatterns.InactivityGap.UnusuallyLongCount</strong></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
     </div>
 
-}
+    @if (_status.BetIntervalForecasts.Count > 0)
+    {
+        <div class="card bg-dark border-secondary mb-4">
+            <div class="card-body">
+                <h6 class="card-title mb-3">📊 Bet Interval Forecasts</h6>
+                <div class="row g-3">
+                    @foreach (var bet in _status.BetIntervalForecasts)
+                    {
+                        <div class="col-lg-6">
+                            <div class="tracking-card">
+                                <div class="tracking-header">
+                                    <div class="fw-semibold small">@bet.Title</div>
+                                    <div class="d-flex gap-3 mt-1 small text-muted">
+                                        <span>⏳ @bet.TimeRemaining</span>
+                                        <span>✅ @bet.TweetsInWindow tweets</span>
+                                        <span>🔮 @bet.PredictedTotal <span class="text-muted">[@bet.CiLower–@bet.CiUpper]</span> σ≈@bet.Sigma.ToString("F1")</span>
+                                    </div>
+                                </div>
+                                <div class="tracking-body p-2">
+                                    @foreach (var interval in bet.Intervals)
+                                    {
+                                        <div class="d-flex align-items-center gap-2 py-1 px-2 small @(interval.IsPredicted ? "rounded" : "")" style="@(interval.IsPredicted ? "background: rgba(88, 166, 255, 0.1);" : "")">
+                                            <span class="text-muted" style="min-width: 60px;">@interval.Label</span>
+                                            <div class="flex-grow-1">
+                                                <div class="progress" style="height: 10px; background: var(--border-color);">
+                                                    <div class="progress-bar @(interval.IsPredicted ? "bg-info" : "bg-secondary")" style="width: @interval.Probability.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)%"></div>
+                                                </div>
+                                            </div>
+                                            <span class="@(interval.IsPredicted ? "text-info fw-semibold" : "text-muted")" style="min-width: 50px; text-align: right;">@interval.Probability.ToString("F1")%</span>
+                                            @if (interval.IsPredicted) { <span class="text-info">◄</span> }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (_status.TemporalPatterns.HasData)
+    {
+        <div class="row g-3 mb-4">
+            @if (_status.TemporalPatterns.DayOfWeek.Count > 0)
+            {
+                <div class="col-12">
+                    <div class="card bg-dark border-secondary">
+                        <div class="card-body">
+                            <h6 class="card-title mb-3">📅 Day-of-Week Distribution</h6>
+                            @foreach (var day in _status.TemporalPatterns.DayOfWeek)
+                            {
+                                <div class="d-flex align-items-center gap-2 mb-1 small">
+                                    <span class="text-muted" style="min-width: 80px;">@day.Day</span>
+                                    <div class="flex-grow-1">
+                                        <div class="progress" style="height: 8px; background: var(--border-color);">
+                                            <div class="progress-bar bg-primary" style="width: @day.Percentage.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)%"></div>
+                                        </div>
+                                    </div>
+                                    <span class="text-muted" style="min-width: 85px; text-align: right;">@day.Percentage.ToString("F1")% (@day.Count)</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @if (_status.TemporalPatterns.Hourly.Count > 0)
+            {
+                <div class="col-12">
+                    <div class="card bg-dark border-secondary">
+                        <div class="card-body">
+                            <h6 class="card-title mb-3">
+                                🕐 Hourly Distribution (EST)
+                                @if (!string.IsNullOrEmpty(_status.TemporalPatterns.PeakHour))
+                                {
+                                    <span class="badge bg-info ms-2 small">Peak: @_status.TemporalPatterns.PeakHour</span>
+                                }
+                            </h6>
+                            @{ var maxHourly = _status.TemporalPatterns.Hourly.Max(h => h.Count); }
+                            @foreach (var hour in _status.TemporalPatterns.Hourly)
+                            {
+                                var barPct = maxHourly > 0 ? (100.0 * hour.Count / maxHourly) : 0;
+                                var isPeak = hour.Hour == _status.TemporalPatterns.PeakHour;
+                                <div class="d-flex align-items-center gap-2 mb-1 small">
+                                    <span class="@(isPeak ? "text-info fw-semibold" : "text-muted")" style="min-width: 42px;">@hour.Hour</span>
+                                    <div class="flex-grow-1">
+                                        <div class="progress" style="height: 6px; background: var(--border-color);">
+                                            <div class="progress-bar @(isPeak ? "bg-info" : "bg-secondary")" style="width: @barPct.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)%"></div>
+                                        </div>
+                                    </div>
+                                    <span class="@(isPeak ? "text-info" : "text-muted")" style="min-width: 35px; text-align: right;">@hour.Count</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    }
 
 @code {
     private PredictorStatus? _status;
