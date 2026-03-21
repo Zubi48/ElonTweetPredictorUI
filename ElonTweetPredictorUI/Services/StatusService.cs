@@ -14,8 +14,9 @@ public class StatusService : IStatusService
 
     public StatusService(IConfiguration configuration)
     {
-        var dataPath = configuration["DataPath"] ?? ".";
-        _filePath = Path.Combine(dataPath, "status.json");
+        var cachePath = configuration["CachePath"]
+            ?? Path.Combine(Path.GetTempPath(), "predictor-cache");
+        _filePath = Path.Combine(cachePath, "status.json");
     }
 
     public async Task<PredictorStatus?> GetStatusAsync()

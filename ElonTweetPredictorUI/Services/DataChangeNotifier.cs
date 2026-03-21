@@ -15,15 +15,17 @@ public sealed class DataChangeNotifier : IDataChangeNotifier, IDisposable
 
     public DataChangeNotifier(IConfiguration configuration, ILogger<DataChangeNotifier> logger)
     {
-        var dataPath = configuration["DataPath"] ?? ".";
+        var cachePath = configuration["CachePath"]
+            ?? Path.Combine(Path.GetTempPath(), "predictor-cache");
+        Directory.CreateDirectory(cachePath);
 
-        if (!Directory.Exists(dataPath))
+        if (!Directory.Exists(cachePath))
         {
-            logger.LogWarning("Data path '{DataPath}' does not exist. Live file updates are disabled.", dataPath);
+            logger.LogWarning("Cache path '{CachePath}' does not exist. Live file updates are disabled.", cachePath);
             return;
         }
 
-        _watcher = new FileSystemWatcher(dataPath)
+        _watcher = new FileSystemWatcher(cachePath)
         {
             NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.Size | NotifyFilters.CreationTime,
             IncludeSubdirectories = false,

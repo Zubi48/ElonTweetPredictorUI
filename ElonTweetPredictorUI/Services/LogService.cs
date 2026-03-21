@@ -14,8 +14,9 @@ public class LogService : ILogService
 
     public LogService(IConfiguration configuration)
     {
-        var dataPath = configuration["DataPath"] ?? ".";
-        _filePath = Path.Combine(dataPath, "logs.json");
+        var cachePath = configuration["CachePath"]
+            ?? Path.Combine(Path.GetTempPath(), "predictor-cache");
+        _filePath = Path.Combine(cachePath, "logs.json");
     }
 
     public async Task<List<LogEntry>> GetRecentLogsAsync(int count = 100)

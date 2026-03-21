@@ -105,9 +105,12 @@ public sealed partial class LogConverterService : BackgroundService
     public LogConverterService(IConfiguration configuration, ILogger<LogConverterService> logger)
     {
         _dataPath = configuration["DataPath"] ?? ".";
+        var cachePath = configuration["CachePath"]
+            ?? Path.Combine(Path.GetTempPath(), "predictor-cache");
+        Directory.CreateDirectory(cachePath);
         _logFilePath = Path.Combine(_dataPath, "tweet_predictor.log");
-        _statusJsonPath = Path.Combine(_dataPath, "status.json");
-        _logsJsonPath = Path.Combine(_dataPath, "logs.json");
+        _statusJsonPath = Path.Combine(cachePath, "status.json");
+        _logsJsonPath = Path.Combine(cachePath, "logs.json");
         _logger = logger;
     }
 
