@@ -15,6 +15,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.KnownProxies.Clear();
 });
 
+builder.Services.AddSingleton<IContainerRestartService, ContainerRestartService>();
 builder.Services.AddSingleton<IStatusService, StatusService>();
 builder.Services.AddSingleton<ILogService, LogService>();
 builder.Services.AddSingleton<IModelFileService, ModelFileService>();

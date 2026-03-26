@@ -6,13 +6,16 @@ services:
       dockerfile: Dockerfile
     container_name: elon-tweet-predictor-ui
     restart: unless-stopped
+    user: "0:0"
     environment:
       ASPNETCORE_URLS: http://0.0.0.0:8080
       ASPNETCORE_ENVIRONMENT: Production
       DataPath: /app/data
       TZ: America/New_York
+      PredictorContainerName: elon-tweet-predictor
     volumes:
       - predictor-data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - proxy
     labels:

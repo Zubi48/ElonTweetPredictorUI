@@ -3,6 +3,7 @@
 @implements IDisposable
 @inject IStatusService StatusService
 @inject IModelFileService ModelFileService
+@inject IContainerRestartService ContainerRestartService
 @inject IDataChangeNotifier DataChangeNotifier
 
 <PageTitle>Management</PageTitle>
@@ -133,6 +134,44 @@ else
                     </div>
                 }
             </div>
+
+            <div class="mt-3 pt-3 border-top border-secondary-subtle">
+                <h6 class="mb-2">🔁 Restart predictor</h6>
+                <p class="small text-muted mb-2">
+                    Sends a restart command to the Python predictor container via the Docker API.
+                </p>
+                @if (_restartConfirming)
+                {
+                    <span class="small text-warning me-2">Restart the predictor container? It will be briefly unavailable.</span>
+                    <button class="btn btn-danger btn-sm me-1"
+                            @onclick="OnRestartConfirmed"
+                            disabled="@_restartInProgress">
+                        Yes, restart
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm"
+                            @onclick="() => _restartConfirming = false"
+                            disabled="@_restartInProgress">
+                        Cancel
+                    </button>
+                }
+                else
+                {
+                    <button class="btn btn-outline-warning btn-sm"
+                            @onclick="() => { _restartConfirming = true; _restartMessage = null; }">
+                        🔁 Restart predictor
+                    </button>
+                }
+                @if (_restartInProgress)
+                {
+                    <div class="small text-info mt-2">Sending restart command...</div>
+                }
+                else if (!string.IsNullOrWhiteSpace(_restartMessage))
+                {
+                    <div class="small mt-2 @(_restartIsError ? "text-danger" : "text-success")">
+                        @_restartMessage
+                    </div>
+                }
+            </div>
         </div>
     </div>
 }
@@ -149,6 +188,10 @@ else
     private bool _csvUploadInProgress;
     private string? _csvUploadMessage;
     private bool _csvUploadIsError;
+    private bool _restartConfirming;
+    private bool _restartInProgress;
+    private string? _restartMessage;
+    private bool _restartIsError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -264,6 +307,32 @@ else
         {
             _csvUploadInProgress = false;
             await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task OnRestartConfirmed()
+    {
+        _restartInProgress = true;
+        _restartConfirming = false;
+        _restartMessage = null;
+        _restartIsError = false;
+        StateHasChanged();
+
+        try
+        {
+            var result = await ContainerRestartService.RestartPredictorAsync();
+            _restartIsError = !result.Success;
+            _restartMessage = result.Message;
+        }
+        catch (Exception ex)
+        {
+            _restartIsError = true;
+            _restartMessage = $"Failed: {ex.Message}";
+        }
+        finally
+        {
+            _restartInProgress = false;
+            StateHasChanged();
         }
     }
 
