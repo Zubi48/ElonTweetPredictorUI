@@ -11,6 +11,5 @@ steps:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     commands:
-      - echo "Building and deploying UI container only..."
-      - docker compose -f ElonTweetPredictorUI/PythonScript/docker-compose.yml build --no-cache tweet-predictor-ui
-      - docker compose -f ElonTweetPredictorUI/PythonScript/docker-compose.yml up -d --force-recreate --no-deps tweet-predictor-ui
+      - docker compose down
+      - docker compose up -d --build --force-recreate
