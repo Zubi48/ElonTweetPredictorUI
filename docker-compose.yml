@@ -1,12 +1,9 @@
 services:
   tweet-predictor-ui:
     image: elon-tweet-predictor-ui:latest
-    pull_policy: always
     build:
-      context: ..
+      context: ./ElonTweetPredictorUI
       dockerfile: Dockerfile
-      pull: true
-      no_cache: true
     container_name: elon-tweet-predictor-ui
     restart: unless-stopped
     user: "0:0"
