@@ -11,5 +11,8 @@ steps:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     commands:
-      - docker compose down
-      - docker compose up -d --build --force-recreate
+      - echo "Building and deploying UI container only..."
+      - docker compose -f docker-compose.yml build --no-cache tweet-predictor-ui
+      - docker rm -f elon-tweet-predictor-ui || true
+      - docker compose -f docker-compose.yml up -d --force-recreate --no-deps tweet-predictor-ui
+      - docker inspect elon-tweet-predictor-ui --format '{{range .Mounts}}{{if eq .Destination "/app/data"}}ui => {{.Type}} | {{.Name}} | {{.Source}} -> {{.Destination}}{{end}}{{end}}'
