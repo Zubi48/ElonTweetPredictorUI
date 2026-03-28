@@ -27,6 +27,7 @@ builder.Services.AddSingleton<IDataFileService, DataFileService>();
 builder.Services.AddHostedService<LogConverterService>();
 builder.Services.AddSignalR();
 builder.Services.AddHostedService<SignalRBridgeService>();
+builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
@@ -38,6 +39,13 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 app.UseForwardedHeaders();
+
+app.MapOpenApi();
+app.UseSwaggerUI(options =>
+{
+    options.SwaggerEndpoint("/openapi/v1.json", "Elon Tweet Predictor API");
+});
+
 app.UseWhen(
     context => !context.Request.Path.StartsWithSegments("/api")
             && !context.Request.Path.StartsWithSegments("/hubs"),
