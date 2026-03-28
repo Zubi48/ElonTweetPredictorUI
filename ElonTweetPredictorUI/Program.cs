@@ -1,4 +1,6 @@
+using ElonTweetPredictorUI.Api;
 using ElonTweetPredictorUI.Components;
+using ElonTweetPredictorUI.Hubs;
 using ElonTweetPredictorUI.Services;
 using Microsoft.AspNetCore.HttpOverrides;
 
@@ -23,6 +25,8 @@ builder.Services.AddSingleton<IBetProbabilityService, BetProbabilityService>();
 builder.Services.AddSingleton<IDataChangeNotifier, DataChangeNotifier>();
 builder.Services.AddSingleton<IDataFileService, DataFileService>();
 builder.Services.AddHostedService<LogConverterService>();
+builder.Services.AddSignalR();
+builder.Services.AddHostedService<SignalRBridgeService>();
 
 var app = builder.Build();
 
@@ -34,7 +38,10 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 app.UseForwardedHeaders();
-app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+app.UseWhen(
+    context => !context.Request.Path.StartsWithSegments("/api")
+            && !context.Request.Path.StartsWithSegments("/hubs"),
+    branch => branch.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true));
 
 app.UseAntiforgery();
 
@@ -49,6 +56,9 @@ app.MapGet("/downloads/{fileType}", async (string fileType, IDataFileService dat
 
     return Results.File(result.FilePath, result.ContentType, result.DownloadFileName, enableRangeProcessing: true);
 });
+
+app.MapHub<PredictionHub>("/hubs/predictions");
+app.MapPredictionApi();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

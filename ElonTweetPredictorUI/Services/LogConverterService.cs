@@ -178,15 +178,11 @@ public sealed partial class LogConverterService : BackgroundService
 
             var status = BuildStatus(lines);
 
-            var betProbLines = CollectBetProbabilityLines(lines);
-
             await WriteAtomicAsync(_logsJsonPath, () =>
             {
                 var sb = new StringBuilder();
                 foreach (var entry in logEntries)
                     sb.AppendLine(JsonSerializer.Serialize(entry));
-                foreach (var raw in betProbLines)
-                    sb.AppendLine(raw);
                 return sb.ToString();
             });
 
@@ -667,18 +663,6 @@ public sealed partial class LogConverterService : BackgroundService
             }
         }
 
-        return result;
-    }
-
-    private static List<string> CollectBetProbabilityLines(string[] lines)
-    {
-        var result = new List<string>();
-        foreach (var rawLine in lines)
-        {
-            var line = rawLine.TrimEnd('\r');
-            if (line.StartsWith('{') && line.Contains("\"bet_probabilities\""))
-                result.Add(line);
-        }
         return result;
     }
 
