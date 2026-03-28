@@ -54,16 +54,6 @@ app.UseWhen(
 app.UseAntiforgery();
 
 app.MapStaticAssets();
-app.MapGet("/downloads/{fileType}", async (string fileType, IDataFileService dataFileService) =>
-{
-    var result = await dataFileService.ResolveAsync(fileType);
-    if (result is null)
-    {
-        return Results.NotFound();
-    }
-
-    return Results.File(result.FilePath, result.ContentType, result.DownloadFileName, enableRangeProcessing: true);
-});
 
 app.MapHub<PredictionHub>("/hubs/predictions");
 app.MapPredictionApi();
