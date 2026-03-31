@@ -9,7 +9,7 @@ namespace ElonTweetPredictorUI.Services;
 /// Listens for file changes via <see cref="IDataChangeNotifier"/> and pushes
 /// updated data to all connected SignalR clients.
 /// </summary>
-public sealed class SignalRBridgeService : IHostedService, IDisposable
+public sealed class SignalRBridgeService : BackgroundService, IDisposable
 {
     private readonly IDataChangeNotifier _notifier;
     private readonly IHubContext<PredictionHub> _hubContext;
@@ -28,19 +28,23 @@ public sealed class SignalRBridgeService : IHostedService, IDisposable
         _logger = logger;
     }
 
-    public Task StartAsync(CancellationToken cancellationToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _notifier.DataChanged += OnDataChangedAsync;
-        return Task.CompletedTask;
-    }
 
-    public Task StopAsync(CancellationToken cancellationToken)
-    {
-        _notifier.DataChanged -= OnDataChangedAsync;
-        return Task.CompletedTask;
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            await PushUpdateAsync();
+            await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+        }
     }
 
     private async Task OnDataChangedAsync()
+    {
+        await PushUpdateAsync();
+    }
+
+    private async Task PushUpdateAsync()
     {
         try
         {
@@ -54,8 +58,9 @@ public sealed class SignalRBridgeService : IHostedService, IDisposable
         }
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
         _notifier.DataChanged -= OnDataChangedAsync;
+        base.Dispose();
     }
 }
