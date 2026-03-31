@@ -3,6 +3,7 @@ namespace ElonTweetPredictorUI.Services;
 public interface IDataChangeNotifier
 {
     event Func<Task>? DataChanged;
+    void NotifyChanged();
 }
 
 public sealed class DataChangeNotifier : IDataChangeNotifier, IDisposable
@@ -72,6 +73,8 @@ public sealed class DataChangeNotifier : IDataChangeNotifier, IDisposable
             _debounceTimer.Change(TimeSpan.FromMilliseconds(250), Timeout.InfiniteTimeSpan);
         }
     }
+
+    public void NotifyChanged() => ScheduleNotification();
 
     private async Task NotifySubscribersAsync()
     {

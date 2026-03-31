@@ -2,7 +2,6 @@
 @rendermode InteractiveServer
 @implements IDisposable
 @inject IStatusService StatusService
-@inject IBetProbabilityService BetProbabilityService
 @inject IDataChangeNotifier DataChangeNotifier
 
 <PageTitle>Tweet Predictor Dashboard</PageTitle>
@@ -78,68 +77,6 @@ else
                             <div class="small fw-semibold" style="font-size: 0.65rem;">@week.Count</div>
                         </div>
                     }
-                </div>
-            </div>
-        </div>
-    }
-
-    @if (_betProbabilities is not null && _betProbabilities.Trackings.Count > 0)
-    {
-        <div class="card bg-dark border-secondary mb-4">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h6 class="card-title mb-0">🎲 Bet Probabilities (@_betProbabilities.Trackings.Count)</h6>
-                    <span class="small text-muted">Updated: @FormatTimestamp(_betProbabilities.Timestamp)</span>
-                </div>
-                <div class="table-responsive">
-                    <table class="table table-sm table-dark table-hover mb-0">
-                        <thead>
-                            <tr>
-                                <th>Market</th>
-                                <th class="text-end">Tweets</th>
-                                <th class="text-end">Predicted</th>
-                                <th class="text-end">Progress</th>
-                                <th class="text-end">95% CI</th>
-                                <th class="text-end">Window</th>
-                                @if (_betProbabilities.Trackings.Any(t => t.HasKellyData))
-                                {
-                                    <th class="text-end">Side</th>
-                                    <th class="text-end">Edge</th>
-                                    <th class="text-end">Kelly %</th>
-                                }
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var t in _betProbabilities.Trackings)
-                            {
-                                <tr>
-                                    <td>
-                                        <div>@t.Title</div>
-                                        <small class="text-muted">@t.TrackingId[..8]…</small>
-                                    </td>
-                                    <td class="text-end text-primary"><strong>@t.TweetsInWindow.ToString("N0")</strong></td>
-                                    <td class="text-end text-info"><strong>@t.WindowPrediction.ToString("N0")</strong></td>
-                                    <td class="text-end" style="min-width: 100px;">
-                                        @{ var pct = t.WindowPrediction > 0 ? Math.Min(100, (int)(100.0 * t.TweetsInWindow / t.WindowPrediction)) : 0; }
-                                        <div class="progress" style="height: 6px; background: var(--border-color);">
-                                            <div class="progress-bar @(pct >= 90 ? "bg-success" : pct >= 50 ? "bg-info" : "bg-primary")" style="width: @pct%"></div>
-                                        </div>
-                                        <span class="small text-muted">@pct%</span>
-                                    </td>
-                                    <td class="text-end"><span class="small">@t.WindowCiLower.ToString("N0")–@t.WindowCiUpper.ToString("N0")</span></td>
-                                    <td class="text-end"><span class="small">@t.ElapsedDays.ToString("F1")d / @t.WindowDays.ToString("F0")d</span></td>
-                                    @if (_betProbabilities.Trackings.Any(bt => bt.HasKellyData))
-                                    {
-                                        <td class="text-end"><strong>@(t.TierEmoji ?? "") @(t.Side ?? "—")</strong></td>
-                                        <td class="text-end @(t.EdgePct >= 0 ? "text-success" : "text-danger")">
-                                            @(t.EdgePct is not null ? $"{(t.EdgePct >= 0 ? "+" : "")}{t.EdgePct:F1}%" : "—")
-                                        </td>
-                                        <td class="text-end">@(t.FracKellyPct?.ToString("F1") ?? "—")%</td>
-                                    }
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
                 </div>
             </div>
         </div>
@@ -320,7 +257,6 @@ else
 @code {
     private PredictorStatus? _status;
     private bool _initialLoadCompleted;
-    private BetProbabilityEntry? _betProbabilities;
 
     protected override async Task OnInitializedAsync()
     {
@@ -340,7 +276,6 @@ else
     private async Task RefreshData()
     {
         _status = await StatusService.GetStatusAsync();
-        _betProbabilities = await BetProbabilityService.GetLatestAsync();
         _initialLoadCompleted = true;
     }
 

@@ -21,7 +21,6 @@ builder.Services.AddSingleton<IContainerRestartService, ContainerRestartService>
 builder.Services.AddSingleton<IStatusService, StatusService>();
 builder.Services.AddSingleton<ILogService, LogService>();
 builder.Services.AddSingleton<IModelFileService, ModelFileService>();
-builder.Services.AddSingleton<IBetProbabilityService, BetProbabilityService>();
 builder.Services.AddSingleton<IDataChangeNotifier, DataChangeNotifier>();
 builder.Services.AddSingleton<IDataFileService, DataFileService>();
 builder.Services.AddHostedService<LogConverterService>();

@@ -16,6 +16,7 @@ public sealed partial class LogConverterService : BackgroundService
     private readonly string _logFilePath;
     private readonly string _statusJsonPath;
     private readonly string _logsJsonPath;
+    private readonly IDataChangeNotifier _notifier;
     private readonly ILogger<LogConverterService> _logger;
     private readonly SemaphoreSlim _convertLock = new(1, 1);
 
@@ -102,7 +103,7 @@ public sealed partial class LogConverterService : BackgroundService
     [GeneratedRegex(@"(<?\d+(?:-\d+)?)\s+(\d+\.?\d*)%")]
     private static partial Regex IntervalRowRegex();
 
-    public LogConverterService(IConfiguration configuration, ILogger<LogConverterService> logger)
+    public LogConverterService(IConfiguration configuration, IDataChangeNotifier notifier, ILogger<LogConverterService> logger)
     {
         _dataPath = configuration["DataPath"] ?? ".";
         var cachePath = configuration["CachePath"]
@@ -111,6 +112,7 @@ public sealed partial class LogConverterService : BackgroundService
         _logFilePath = Path.Combine(_dataPath, "tweet_predictor.log");
         _statusJsonPath = Path.Combine(cachePath, "status.json");
         _logsJsonPath = Path.Combine(cachePath, "logs.json");
+        _notifier = notifier;
         _logger = logger;
     }
 
@@ -188,6 +190,8 @@ public sealed partial class LogConverterService : BackgroundService
 
             await WriteAtomicAsync(_statusJsonPath, () =>
                 JsonSerializer.Serialize(status, s_statusJsonOptions));
+
+            _notifier.NotifyChanged();
 
             _logger.LogDebug(
                 "Converted tweet_predictor.log → status.json + logs.json ({Lines} lines, {Entries} entries)",
