@@ -183,9 +183,9 @@ else
                                             </div>
                                             <span class="@(interval.IsPredicted ? "text-info fw-semibold" : "text-muted")" style="min-width: 50px; text-align: right;">@interval.Probability.ToString("F1")%</span>
                                             <span class="delta-badges" style="min-width: 180px; display: inline-flex; gap: 4px; justify-content: flex-end;">
-                                                @RenderDelta(deltas.Delta5Min, "5m")
-                                                @RenderDelta(deltas.Delta30Min, "30m")
                                                 @RenderDelta(deltas.Delta1Hr, "1h")
+                                                @RenderDelta(deltas.Delta30Min, "30m")
+                                                @RenderDelta(deltas.Delta5Min, "5m")
                                             </span>
                                             @if (interval.IsPredicted) { <span class="text-info">◄</span> }
                                         </div>
