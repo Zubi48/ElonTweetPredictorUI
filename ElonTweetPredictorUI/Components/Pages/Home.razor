@@ -3,6 +3,7 @@
 @implements IDisposable
 @inject IStatusService StatusService
 @inject IDataChangeNotifier DataChangeNotifier
+@inject IProbabilityHistoryService ProbabilityHistory
 
 <PageTitle>Tweet Predictor Dashboard</PageTitle>
 
@@ -172,6 +173,7 @@ else
                                 <div class="tracking-body p-2">
                                     @foreach (var interval in bet.Intervals)
                                     {
+                                        var deltas = ProbabilityHistory.GetDeltas(bet.Title, interval.Label);
                                         <div class="d-flex align-items-center gap-2 py-1 px-2 small @(interval.IsPredicted ? "rounded" : "")" style="@(interval.IsPredicted ? "background: rgba(88, 166, 255, 0.1);" : "")">
                                             <span class="text-muted" style="min-width: 60px;">@interval.Label</span>
                                             <div class="flex-grow-1">
@@ -180,6 +182,11 @@ else
                                                 </div>
                                             </div>
                                             <span class="@(interval.IsPredicted ? "text-info fw-semibold" : "text-muted")" style="min-width: 50px; text-align: right;">@interval.Probability.ToString("F1")%</span>
+                                            <span class="delta-badges" style="min-width: 180px; display: inline-flex; gap: 4px; justify-content: flex-end;">
+                                                @RenderDelta(deltas.Delta5Min, "5m")
+                                                @RenderDelta(deltas.Delta30Min, "30m")
+                                                @RenderDelta(deltas.Delta1Hr, "1h")
+                                            </span>
                                             @if (interval.IsPredicted) { <span class="text-info">◄</span> }
                                         </div>
                                     }
@@ -277,7 +284,39 @@ else
     {
         _status = await StatusService.GetStatusAsync();
         _initialLoadCompleted = true;
+
+        if (_status?.BetIntervalForecasts.Count > 0)
+        {
+            ProbabilityHistory.RecordSnapshot(_status.BetIntervalForecasts);
+        }
     }
+
+    private RenderFragment RenderDelta(double? delta, string label) => builder =>
+    {
+        if (delta is null)
+        {
+            builder.OpenElement(0, "span");
+            builder.AddAttribute(1, "class", "badge bg-secondary bg-opacity-25 text-muted");
+            builder.AddAttribute(2, "style", "font-size: 0.6rem; min-width: 52px; text-align: center;");
+            builder.AddContent(3, $"{label} —");
+            builder.CloseElement();
+            return;
+        }
+
+        var val = delta.Value;
+        var css = val > 0 ? "badge bg-success bg-opacity-25 text-success"
+                : val < 0 ? "badge bg-danger bg-opacity-25 text-danger"
+                          : "badge bg-secondary bg-opacity-25 text-muted";
+        var arrow = val > 0 ? "▲" : val < 0 ? "▼" : "—";
+        var display = val == 0 ? $"{label} {arrow}" : $"{label} {arrow}{Math.Abs(val):F1}%";
+
+        builder.OpenElement(0, "span");
+        builder.AddAttribute(1, "class", css);
+        builder.AddAttribute(2, "style", "font-size: 0.6rem; min-width: 52px; text-align: center;");
+        builder.AddAttribute(3, "title", $"Change over last {label}");
+        builder.AddContent(4, display);
+        builder.CloseElement();
+    };
 
     private string FormatTimestamp(string iso8601)
     {
