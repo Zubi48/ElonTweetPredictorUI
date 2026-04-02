@@ -288,22 +288,12 @@ else
 
     private RenderFragment RenderDelta(double? delta, string label) => builder =>
     {
-        if (delta is null)
-        {
-            builder.OpenElement(0, "span");
-            builder.AddAttribute(1, "class", "badge bg-secondary bg-opacity-25 text-muted");
-            builder.AddAttribute(2, "style", "font-size: 0.6rem; min-width: 52px; text-align: center;");
-            builder.AddContent(3, $"{label} —");
-            builder.CloseElement();
-            return;
-        }
-
-        var val = delta.Value;
+        var val = delta ?? 0;
         var css = val > 0 ? "badge bg-success bg-opacity-25 text-success"
                 : val < 0 ? "badge bg-danger bg-opacity-25 text-danger"
                           : "badge bg-secondary bg-opacity-25 text-muted";
-        var arrow = val > 0 ? "▲" : val < 0 ? "▼" : "—";
-        var display = val == 0 ? $"{label} {arrow}" : $"{label} {arrow}{Math.Abs(val):F1}%";
+        var arrow = val > 0 ? "▲" : val < 0 ? "▼" : "";
+        var display = val == 0 ? $"{label} 0%" : $"{label} {arrow}{Math.Abs(val):F1}%";
 
         builder.OpenElement(0, "span");
         builder.AddAttribute(1, "class", css);
