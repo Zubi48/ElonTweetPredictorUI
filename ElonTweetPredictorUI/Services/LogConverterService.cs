@@ -17,6 +17,7 @@ public sealed partial class LogConverterService : BackgroundService
     private readonly string _statusJsonPath;
     private readonly string _logsJsonPath;
     private readonly IDataChangeNotifier _notifier;
+    private readonly IProbabilityHistoryService _probabilityHistory;
     private readonly ILogger<LogConverterService> _logger;
     private readonly SemaphoreSlim _convertLock = new(1, 1);
 
@@ -103,7 +104,11 @@ public sealed partial class LogConverterService : BackgroundService
     [GeneratedRegex(@"(<?\d+(?:-\d+)?)\s+(\d+\.?\d*)%")]
     private static partial Regex IntervalRowRegex();
 
-    public LogConverterService(IConfiguration configuration, IDataChangeNotifier notifier, ILogger<LogConverterService> logger)
+    public LogConverterService(
+        IConfiguration configuration,
+        IDataChangeNotifier notifier,
+        IProbabilityHistoryService probabilityHistory,
+        ILogger<LogConverterService> logger)
     {
         _dataPath = configuration["DataPath"] ?? ".";
         var cachePath = configuration["CachePath"]
@@ -113,6 +118,7 @@ public sealed partial class LogConverterService : BackgroundService
         _statusJsonPath = Path.Combine(cachePath, "status.json");
         _logsJsonPath = Path.Combine(cachePath, "logs.json");
         _notifier = notifier;
+        _probabilityHistory = probabilityHistory;
         _logger = logger;
     }
 
@@ -179,6 +185,12 @@ public sealed partial class LogConverterService : BackgroundService
                 logEntries = logEntries[^MaxLogEntries..];
 
             var status = BuildStatus(lines);
+
+            // Parse ALL recent bet-interval blocks from the log (last ~2 hours)
+            // and seed the probability history service so delta badges work
+            // immediately — even after a container restart.
+            var betSnapshots = ParseAllBetIntervalSnapshots(lines);
+            _probabilityHistory.SeedFromLog(betSnapshots);
 
             await WriteAtomicAsync(_logsJsonPath, () =>
             {
@@ -587,32 +599,76 @@ public sealed partial class LogConverterService : BackgroundService
 
     private static List<BetIntervalForecast> ParseBetIntervalForecasts(string[] lines)
     {
-        var result = new List<BetIntervalForecast>();
-
         // Find last "BET ANSWER INTERVAL PROBABILITIES" block
-        int startIdx = -1;
         for (var i = lines.Length - 1; i >= 0; i--)
         {
             if (lines[i].Contains("BET ANSWER INTERVAL PROBABILITIES"))
-            {
-                startIdx = i;
-                break;
-            }
+                return ParseBetBlockStartingAt(lines, i, out _);
         }
 
-        if (startIdx < 0)
-            return result;
+        return [];
+    }
 
+    /// <summary>
+    /// Find ALL "BET ANSWER INTERVAL PROBABILITIES" blocks in the log (scanning
+    /// from the end), extract a timestamp for each, and return them in
+    /// chronological order.  We stop once we've gone back more than ~2.5 hours
+    /// from the newest block so we don't parse the entire log file on huge logs.
+    /// </summary>
+    private List<HistoricalBetSnapshot> ParseAllBetIntervalSnapshots(string[] lines)
+    {
+        var snapshots = new List<HistoricalBetSnapshot>();
+        DateTime? latestTimestamp = null;
+
+        for (var i = lines.Length - 1; i >= 0; i--)
+        {
+            var line = lines[i].TrimEnd('\r');
+            if (!line.Contains("BET ANSWER INTERVAL PROBABILITIES"))
+                continue;
+
+            var timestamp = ExtractTimestamp(line);
+            latestTimestamp ??= timestamp;
+
+            // Stop once we've gone back more than 2.5 hours from the newest block
+            if ((latestTimestamp.Value - timestamp).TotalHours > 2.5)
+                break;
+
+            var forecasts = ParseBetBlockStartingAt(lines, i, out _);
+            if (forecasts.Count > 0)
+                snapshots.Add(new HistoricalBetSnapshot(timestamp, forecasts));
+        }
+
+        snapshots.Reverse(); // chronological order (oldest → newest)
+        return snapshots;
+    }
+
+    /// <summary>
+    /// Parse a single bet-interval block starting at <paramref name="headerIdx"/>
+    /// (the line containing "BET ANSWER INTERVAL PROBABILITIES").
+    /// </summary>
+    private static List<BetIntervalForecast> ParseBetBlockStartingAt(
+        string[] lines, int headerIdx, out int endIdx)
+    {
+        var result = new List<BetIntervalForecast>();
         BetIntervalForecast? current = null;
         bool inIntervals = false;
+        endIdx = headerIdx;
 
-        for (var i = startIdx + 1; i < lines.Length; i++)
+        for (var i = headerIdx + 1; i < lines.Length; i++)
         {
+            endIdx = i;
             var line = lines[i].TrimEnd('\r');
 
             // End of entire block — closing ====== after at least one market
             if (line.Contains("======") && result.Count > 0)
                 break;
+
+            // Another BET ANSWER block means we went past this block
+            if (line.Contains("BET ANSWER INTERVAL PROBABILITIES"))
+            {
+                endIdx = i - 1;
+                break;
+            }
 
             var titleMatch = BetTitleRegex().Match(line);
             if (titleMatch.Success)
@@ -668,6 +724,42 @@ public sealed partial class LogConverterService : BackgroundService
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Extract a timestamp from a log line.
+    /// Handles both the text format  <c>2025-04-01 12:00:00,123 [INFO] ...</c>
+    /// and JSON structured format    <c>{"timestamp": "...", ...}</c>.
+    /// </summary>
+    private static DateTime ExtractTimestamp(string line)
+    {
+        // Text log format: "2025-04-01 12:00:00,123 [INFO] predictor — ..."
+        var logMatch = LogLineRegex().Match(line);
+        if (logMatch.Success && DateTime.TryParseExact(logMatch.Groups[1].Value,
+                "yyyy-MM-dd HH:mm:ss,fff", CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out var dt))
+        {
+            return dt;
+        }
+
+        // JSON structured format: {"timestamp": "2025-04-01T12:00:00", ...}
+        if (line.StartsWith('{'))
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(line);
+                if (doc.RootElement.TryGetProperty("timestamp", out var ts))
+                {
+                    var tsStr = ts.GetString();
+                    if (tsStr is not null && DateTime.TryParse(tsStr, CultureInfo.InvariantCulture,
+                            DateTimeStyles.None, out var jsonDt))
+                        return jsonDt;
+                }
+            }
+            catch { /* malformed JSON — fall through */ }
+        }
+
+        return DateTime.UtcNow;
     }
 
     private static async Task WriteAtomicAsync(string targetPath, Func<string> generateContent)

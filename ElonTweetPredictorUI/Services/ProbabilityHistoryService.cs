@@ -1,55 +1,71 @@
-using System.Collections.Concurrent;
 using ElonTweetPredictorUI.Models;
 
 namespace ElonTweetPredictorUI.Services;
 
 public interface IProbabilityHistoryService
 {
-    void RecordSnapshot(List<BetIntervalForecast> forecasts);
+    /// <summary>
+    /// Replace all history with timestamped snapshots parsed from the log file.
+    /// Called by <see cref="LogConverterService"/> on every conversion.
+    /// </summary>
+    void SeedFromLog(List<HistoricalBetSnapshot> snapshots);
+
     ProbabilityDeltas GetDeltas(string betTitle, string intervalLabel);
 }
+
+/// <summary>A timestamped set of bet interval forecasts extracted from the log.</summary>
+public sealed record HistoricalBetSnapshot(DateTime Timestamp, List<BetIntervalForecast> Forecasts);
 
 /// <summary>
 /// Tracks probability values over time so the UI can show how much each
 /// interval probability has changed in the last 5 min, 30 min, and 1 hour.
+///
+/// Data is seeded entirely from the <c>tweet_predictor.log</c> file by
+/// <see cref="LogConverterService"/>, so it survives container restarts and
+/// is available immediately on startup.
 /// </summary>
 public sealed class ProbabilityHistoryService : IProbabilityHistoryService
 {
     private static readonly TimeSpan MaxRetention = TimeSpan.FromHours(2);
 
-    private readonly ConcurrentDictionary<string, List<ProbabilitySnapshot>> _history = new();
+    // key = "betTitle||intervalLabel"  →  chronologically sorted snapshots
+    private readonly Dictionary<string, List<ProbabilitySnapshot>> _history = new();
     private readonly object _lock = new();
 
-    public void RecordSnapshot(List<BetIntervalForecast> forecasts)
+    public void SeedFromLog(List<HistoricalBetSnapshot> snapshots)
     {
-        var now = DateTime.UtcNow;
-
-        foreach (var bet in forecasts)
+        lock (_lock)
         {
-            foreach (var interval in bet.Intervals)
+            _history.Clear();
+
+            foreach (var snapshot in snapshots)
             {
-                var key = BuildKey(bet.Title, interval.Label);
-                var snapshot = new ProbabilitySnapshot(now, interval.Probability);
-
-                lock (_lock)
+                foreach (var bet in snapshot.Forecasts)
                 {
-                    var list = _history.GetOrAdd(key, _ => new List<ProbabilitySnapshot>());
-
-                    // Only add if the timestamp differs from the last entry by ≥1 s
-                    // (avoids duplicates from rapid re-renders).
-                    if (list.Count == 0 || (now - list[^1].Timestamp).TotalSeconds >= 1)
+                    foreach (var interval in bet.Intervals)
                     {
-                        list.Add(snapshot);
-                    }
-                    else
-                    {
-                        // Update the latest entry's value
-                        list[^1] = snapshot;
-                    }
+                        var key = BuildKey(bet.Title, interval.Label);
 
-                    // Prune entries older than MaxRetention
-                    var cutoff = now - MaxRetention;
-                    list.RemoveAll(s => s.Timestamp < cutoff);
+                        if (!_history.TryGetValue(key, out var list))
+                        {
+                            list = [];
+                            _history[key] = list;
+                        }
+
+                        list.Add(new ProbabilitySnapshot(snapshot.Timestamp, interval.Probability));
+                    }
+                }
+            }
+
+            // Ensure chronological order and prune
+            foreach (var kvp in _history)
+            {
+                kvp.Value.Sort((a, b) => a.Timestamp.CompareTo(b.Timestamp));
+
+                if (kvp.Value.Count > 0)
+                {
+                    var cutoff = kvp.Value[^1].Timestamp - MaxRetention;
+                    kvp.Value.RemoveAll(s => s.Timestamp < cutoff);
                 }
             }
         }
@@ -61,7 +77,7 @@ public sealed class ProbabilityHistoryService : IProbabilityHistoryService
 
         lock (_lock)
         {
-            if (!_history.TryGetValue(key, out var list) || list.Count == 0)
+            if (!_history.TryGetValue(key, out var list) || list.Count < 2)
             {
                 return ProbabilityDeltas.Empty;
             }
@@ -71,14 +87,15 @@ public sealed class ProbabilityHistoryService : IProbabilityHistoryService
 
             return new ProbabilityDeltas
             {
-                Delta5Min = ComputeDelta(list, current, now, TimeSpan.FromMinutes(5)),
+                Delta5Min  = ComputeDelta(list, current, now, TimeSpan.FromMinutes(5)),
                 Delta30Min = ComputeDelta(list, current, now, TimeSpan.FromMinutes(30)),
-                Delta1Hr = ComputeDelta(list, current, now, TimeSpan.FromHours(1))
+                Delta1Hr   = ComputeDelta(list, current, now, TimeSpan.FromHours(1))
             };
         }
     }
 
-    private static double? ComputeDelta(List<ProbabilitySnapshot> list, double current, DateTime now, TimeSpan lookback)
+    private static double? ComputeDelta(
+        List<ProbabilitySnapshot> list, double current, DateTime now, TimeSpan lookback)
     {
         var targetTime = now - lookback;
 
@@ -87,16 +104,11 @@ public sealed class ProbabilityHistoryService : IProbabilityHistoryService
         foreach (var s in list)
         {
             if (s.Timestamp <= targetTime)
-            {
                 best = s;
-            }
         }
 
-        // If we don't have data going back far enough, return null.
         if (best is null)
-        {
             return null;
-        }
 
         return Math.Round(current - best.Probability, 2);
     }
@@ -109,10 +121,9 @@ public sealed class ProbabilityHistoryService : IProbabilityHistoryService
 
 public class ProbabilityDeltas
 {
-    public double? Delta5Min { get; init; }
+    public double? Delta5Min  { get; init; }
     public double? Delta30Min { get; init; }
-    public double? Delta1Hr { get; init; }
+    public double? Delta1Hr   { get; init; }
 
     public static ProbabilityDeltas Empty { get; } = new();
 }
-

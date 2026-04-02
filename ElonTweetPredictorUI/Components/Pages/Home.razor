@@ -284,11 +284,6 @@ else
     {
         _status = await StatusService.GetStatusAsync();
         _initialLoadCompleted = true;
-
-        if (_status?.BetIntervalForecasts.Count > 0)
-        {
-            ProbabilityHistory.RecordSnapshot(_status.BetIntervalForecasts);
-        }
     }
 
     private RenderFragment RenderDelta(double? delta, string label) => builder =>
