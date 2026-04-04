@@ -10,12 +10,15 @@ public sealed record DataFileDownloadResult(string FilePath, string ContentType,
 public class DataFileService : IDataFileService
 {
     private readonly string _dataPath;
+    private readonly string _cachePath;
     private readonly IStatusService _statusService;
 
     public DataFileService(IConfiguration configuration, IStatusService statusService)
     {
         _statusService = statusService;
         _dataPath = configuration["DataPath"] ?? ".";
+        _cachePath = configuration["CachePath"]
+            ?? Path.Combine(Path.GetTempPath(), "predictor-cache");
     }
 
     public async Task<DataFileDownloadResult?> ResolveAsync(string fileType)
@@ -50,7 +53,7 @@ public class DataFileService : IDataFileService
 
         if (normalized == "logsjson")
         {
-            var logsJsonPath = Path.Combine(_dataPath, "logs.json");
+            var logsJsonPath = Path.Combine(_cachePath, "logs.json");
             if (!File.Exists(logsJsonPath))
             {
                 return null;

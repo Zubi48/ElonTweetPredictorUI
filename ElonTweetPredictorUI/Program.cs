@@ -67,7 +67,8 @@ app.MapGet("/downloads/{fileType}", async (string fileType, IDataFileService dat
         return Results.NotFound();
     }
 
-    return Results.File(result.FilePath, result.ContentType, result.DownloadFileName);
+    var stream = new FileStream(result.FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+    return Results.File(stream, result.ContentType, result.DownloadFileName);
 });
 
 app.MapRazorComponents<App>()
