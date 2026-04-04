@@ -48,7 +48,8 @@ app.UseSwaggerUI(options =>
 
 app.UseWhen(
     context => !context.Request.Path.StartsWithSegments("/api")
-            && !context.Request.Path.StartsWithSegments("/hubs"),
+            && !context.Request.Path.StartsWithSegments("/hubs")
+            && !context.Request.Path.StartsWithSegments("/downloads"),
     branch => branch.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true));
 
 app.UseAntiforgery();
@@ -57,6 +58,17 @@ app.MapStaticAssets();
 
 app.MapHub<PredictionHub>("/hubs/predictions");
 app.MapPredictionApi();
+
+app.MapGet("/downloads/{fileType}", async (string fileType, IDataFileService dataFileService) =>
+{
+    var result = await dataFileService.ResolveAsync(fileType);
+    if (result is null)
+    {
+        return Results.NotFound();
+    }
+
+    return Results.File(result.FilePath, result.ContentType, result.DownloadFileName);
+});
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

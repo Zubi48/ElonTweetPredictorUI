@@ -21,7 +21,7 @@ public class DataFileService : IDataFileService
     public async Task<DataFileDownloadResult?> ResolveAsync(string fileType)
     {
         var normalized = fileType.Trim().ToLowerInvariant();
-        if (normalized is not ("csv" or "log" or "predictorlog" or "logsjson"))
+        if (normalized is not ("csv" or "log" or "predictorlog" or "logsjson" or "model"))
         {
             return null;
         }
@@ -35,6 +35,17 @@ public class DataFileService : IDataFileService
             }
 
             return new DataFileDownloadResult(logPath, "text/plain", "tweet_predictor.log");
+        }
+
+        if (normalized == "model")
+        {
+            var modelPath = Path.Combine(_dataPath, "bayesian_model.pkl");
+            if (!File.Exists(modelPath))
+            {
+                return null;
+            }
+
+            return new DataFileDownloadResult(modelPath, "application/octet-stream", "bayesian_model.pkl");
         }
 
         if (normalized == "logsjson")
