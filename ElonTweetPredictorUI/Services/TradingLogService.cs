@@ -16,6 +16,10 @@ public sealed partial class TradingLogService : ITradingLogService
     [GeneratedRegex(@"NEW SESSION STARTED\s*[—–-]\s*(.+)")]
     private static partial Regex SessionStartRegex();
 
+    // Initial header: Started: 2026-04-04 10:42:55 PM ET
+    [GeneratedRegex(@"^\s+Started:\s+(.+)")]
+    private static partial Regex InitialStartRegex();
+
     // BUY [LIVE] or SELL [LIVE] (WIN) or SELL [LIVE] (LOSS)
     [GeneratedRegex(@"┌── (\w+) \[(\w+)\](?:\s+\((\w+)\))?")]
     private static partial Regex TradeHeaderRegex();
@@ -108,48 +112,30 @@ public sealed partial class TradingLogService : ITradingLogService
         var lines = content.Split('\n');
 
         var session = new TradingSession();
-        string? lastSessionStart = null;
-
-        // Find the last session start
-        foreach (var rawLine in lines)
-        {
-            var line = rawLine.TrimEnd('\r');
-            var sessionMatch = SessionStartRegex().Match(line);
-            if (sessionMatch.Success)
-            {
-                lastSessionStart = sessionMatch.Groups[1].Value.Trim();
-            }
-        }
-
-        session.StartedAt = lastSessionStart ?? "";
-
-        // Parse from the last session start
-        var parsingActive = lastSessionStart is null; // if no session header, parse everything
         TradeEntry? currentTrade = null;
 
         foreach (var rawLine in lines)
         {
             var line = rawLine.TrimEnd('\r');
 
+            // Capture the very first "Started:" header
+            if (string.IsNullOrEmpty(session.StartedAt))
+            {
+                var initMatch = InitialStartRegex().Match(line);
+                if (initMatch.Success)
+                {
+                    session.StartedAt = initMatch.Groups[1].Value.Trim();
+                    continue;
+                }
+            }
+
+            // Track session starts (update timestamp but keep accumulating trades)
             var sessionMatch = SessionStartRegex().Match(line);
             if (sessionMatch.Success)
             {
-                var ts = sessionMatch.Groups[1].Value.Trim();
-                if (ts == lastSessionStart || lastSessionStart is null)
-                {
-                    parsingActive = true;
-                    session.Trades.Clear();
-                    session.StartedAt = ts;
-                }
-                else
-                {
-                    parsingActive = false;
-                }
+                session.StartedAt = sessionMatch.Groups[1].Value.Trim();
                 continue;
             }
-
-            if (!parsingActive)
-                continue;
 
             var headerMatch = TradeHeaderRegex().Match(line);
             if (headerMatch.Success)
@@ -179,7 +165,7 @@ public sealed partial class TradingLogService : ITradingLogService
                 continue;
             }
 
-            // Summary lines
+            // Summary lines (always update — the last one wins)
             ApplySummaryField(session.LatestSummary, line);
         }
 
