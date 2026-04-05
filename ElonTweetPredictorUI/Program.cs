@@ -24,6 +24,8 @@ builder.Services.AddSingleton<ILogService, LogService>();
 builder.Services.AddSingleton<IModelFileService, ModelFileService>();
 builder.Services.AddSingleton<IDataChangeNotifier, DataChangeNotifier>();
 builder.Services.AddSingleton<IDataFileService, DataFileService>();
+builder.Services.AddSingleton<ITradingLogService, TradingLogService>();
+builder.Services.AddSingleton<ITradingChangeNotifier, TradingChangeNotifier>();
 builder.Services.AddHostedService<LogConverterService>();
 builder.Services.AddSignalR();
 builder.Services.AddHostedService<SignalRBridgeService>();

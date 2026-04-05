@@ -1,0 +1,208 @@
+@page "/trading"
+@rendermode InteractiveServer
+@implements IDisposable
+@inject ITradingLogService TradingLogService
+@inject ITradingChangeNotifier TradingChangeNotifier
+
+<PageTitle>Trading</PageTitle>
+
+@if (!_authenticated)
+{
+    <div class="d-flex justify-content-center align-items-center" style="min-height: 60vh;">
+        <div class="card bg-dark border-secondary" style="max-width: 380px; width: 100%;">
+            <div class="card-body">
+                <h6 class="card-title mb-3">🔒 Trading Access</h6>
+                <EditForm Model="_loginModel" OnValidSubmit="OnPasswordSubmit" FormName="tradingLogin">
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Password</label>
+                        <InputText type="password" class="form-control form-control-sm" @bind-Value="_loginModel.Password" />
+                    </div>
+                    @if (_loginFailed)
+                    {
+                        <div class="text-danger small mb-2">Incorrect password.</div>
+                    }
+                    <button type="submit" class="btn btn-primary btn-sm w-100">Unlock</button>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+else if (_session is null)
+{
+    if (!_initialLoadCompleted)
+    {
+        <div class="loading-container">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3 text-muted">Loading trading data...</p>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-warning" role="alert">
+            <h6 class="alert-heading mb-2">No trading data available</h6>
+            <p class="mb-0">The UI cannot find <code>trades.log</code> in the shared data volume (<code>/app/data</code>). Verify the trading bot is running.</p>
+        </div>
+    }
+}
+else
+{
+    <div class="status-bar">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <span class="badge bg-info">TRADING</span>
+                <span class="text-muted small ms-2">Session started: @_session.StartedAt</span>
+            </div>
+            <div class="text-muted small">
+                Live updates enabled
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="metric-card text-center">
+                <div class="metric-label">Buys</div>
+                <div class="metric-value text-info">@_session.LatestSummary.Buys</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="metric-card text-center">
+                <div class="metric-label">Sells</div>
+                <div class="metric-value">@_session.LatestSummary.Sells</div>
+                <div class="metric-sublabel">
+                    <span class="text-success">W @_session.LatestSummary.Wins</span>
+                    <span class="text-muted mx-1">|</span>
+                    <span class="text-danger">L @_session.LatestSummary.Losses</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="metric-card text-center">
+                <div class="metric-label">Win Rate</div>
+                <div class="metric-value @(_session.LatestSummary.WinratePercent >= 50 ? "text-success" : "text-muted")">
+                    @_session.LatestSummary.WinratePercent.ToString("F1")%
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="metric-card text-center">
+                <div class="metric-label">Total P&amp;L</div>
+                <div class="metric-value @(_session.LatestSummary.TotalPnL >= 0 ? "text-success" : "text-danger")">
+                    @(_session.LatestSummary.TotalPnL >= 0 ? "+" : "")$@_session.LatestSummary.TotalPnL.ToString("F2")
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (_session.Trades.Count > 0)
+    {
+        <div class="card bg-dark border-secondary mb-4">
+            <div class="card-body">
+                <h6 class="card-title mb-3">📋 Trades (@_session.Trades.Count)</h6>
+                <div class="trade-list">
+                    @foreach (var trade in Enumerable.Reverse(_session.Trades))
+                    {
+                        <div class="trade-card @(trade.Type == "BUY" ? "trade-buy" : "trade-sell")">
+                            <div class="trade-header">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge @(trade.Type == "BUY" ? "bg-success" : "bg-danger")">@trade.Type</span>
+                                    <span class="badge bg-secondary">@trade.Mode</span>
+                                    <span class="fw-semibold small">@trade.Event</span>
+                                </div>
+                                <div class="small text-muted mt-1">@trade.Time</div>
+                            </div>
+                            <div class="trade-body">
+                                <div class="row g-2 small">
+                                    <div class="col-6 col-md-3">
+                                        <span class="text-muted">Interval:</span>
+                                        <span class="fw-semibold ms-1">@trade.Interval</span>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <span class="text-muted">Shares:</span>
+                                        <span class="fw-semibold ms-1">@trade.Shares</span>
+                                        <span class="text-muted ms-1">@@ $@trade.Price.ToString("F4")</span>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <span class="text-muted">Cost:</span>
+                                        <span class="fw-semibold ms-1">$@trade.Cost.ToString("F2")</span>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <span class="text-muted">Edge:</span>
+                                        <span class="fw-semibold text-info ms-1">@trade.EdgePercent.ToString("F1")%</span>
+                                        <span class="text-muted ms-1 d-none d-lg-inline">(@trade.YourPercent.ToString("F1")% vs @trade.MarketPercent.ToString("F1")%)</span>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <span class="text-muted">Kelly:</span>
+                                        <span class="fw-semibold ms-1">@trade.KellyAdjPercent.ToString("F1")%</span>
+                                        <span class="text-muted ms-1">(raw @trade.KellyRawPercent.ToString("F1")%)</span>
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(trade.OrderId))
+                                    {
+                                        <div class="col-12">
+                                            <span class="text-muted">Order:</span>
+                                            <code class="small ms-1 text-break">@trade.OrderId</code>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private TradingSession? _session;
+    private bool _initialLoadCompleted;
+    private bool _authenticated;
+    private bool _loginFailed;
+    private readonly LoginModel _loginModel = new();
+
+    private const string AccessPassword = "zubi48";
+
+    private async Task OnPasswordSubmit()
+    {
+        if (string.Equals(_loginModel.Password, AccessPassword, StringComparison.Ordinal))
+        {
+            _authenticated = true;
+            _loginFailed = false;
+            await RefreshData();
+            TradingChangeNotifier.TradingDataChanged += HandleDataChangedAsync;
+        }
+        else
+        {
+            _loginFailed = true;
+        }
+
+        _loginModel.Password = "";
+    }
+
+    private async Task HandleDataChangedAsync()
+    {
+        await InvokeAsync(async () =>
+        {
+            await RefreshData();
+            StateHasChanged();
+        });
+    }
+
+    private async Task RefreshData()
+    {
+        _session = await TradingLogService.GetSessionAsync();
+        _initialLoadCompleted = true;
+    }
+
+    public void Dispose()
+    {
+        TradingChangeNotifier.TradingDataChanged -= HandleDataChangedAsync;
+    }
+
+    private sealed class LoginModel
+    {
+        public string Password { get; set; } = "";
+    }
+}
