@@ -19,6 +19,10 @@
     border-left: 3px solid var(--accent-red);
 }
 
+.trade-win {
+    border-left: 3px solid var(--accent-green);
+}
+
 .trade-header {
     padding: 0.75rem 1rem;
     border-bottom: 1px solid var(--border-color);

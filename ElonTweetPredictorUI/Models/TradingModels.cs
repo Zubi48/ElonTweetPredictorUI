@@ -2,12 +2,17 @@ namespace ElonTweetPredictorUI.Models;
 
 public class TradeEntry
 {
+    // Common fields
     public string Type { get; set; } = "";
     public string Mode { get; set; } = "";
+    public string Outcome { get; set; } = "";
     public string Time { get; set; } = "";
     public string Event { get; set; } = "";
     public string Interval { get; set; } = "";
     public int Shares { get; set; }
+    public string OrderId { get; set; } = "";
+
+    // BUY fields
     public decimal Price { get; set; }
     public decimal Cost { get; set; }
     public double EdgePercent { get; set; }
@@ -15,7 +20,18 @@ public class TradeEntry
     public double MarketPercent { get; set; }
     public double KellyRawPercent { get; set; }
     public double KellyAdjPercent { get; set; }
-    public string OrderId { get; set; } = "";
+
+    // SELL fields
+    public decimal EntryPrice { get; set; }
+    public decimal CurrentPrice { get; set; }
+    public decimal PnLAmount { get; set; }
+    public double PnLPercent { get; set; }
+    public string SellEdgeRaw { get; set; } = "";
+    public string SellReason { get; set; } = "";
+
+    public bool IsBuy => Type.Equals("BUY", StringComparison.OrdinalIgnoreCase);
+    public bool IsSell => Type.Equals("SELL", StringComparison.OrdinalIgnoreCase);
+    public bool IsWin => Outcome.Equals("WIN", StringComparison.OrdinalIgnoreCase);
 }
 
 public class TradeSummary

@@ -16,7 +16,8 @@ public sealed partial class TradingLogService : ITradingLogService
     [GeneratedRegex(@"NEW SESSION STARTED\s*[—–-]\s*(.+)")]
     private static partial Regex SessionStartRegex();
 
-    [GeneratedRegex(@"┌── (\w+) \[(\w+)\]")]
+    // BUY [LIVE] or SELL [LIVE] (WIN) or SELL [LIVE] (LOSS)
+    [GeneratedRegex(@"┌── (\w+) \[(\w+)\](?:\s+\((\w+)\))?")]
     private static partial Regex TradeHeaderRegex();
 
     [GeneratedRegex(@"│\s+Time:\s+(.+)")]
@@ -31,17 +32,37 @@ public sealed partial class TradingLogService : ITradingLogService
     [GeneratedRegex(@"│\s+Shares:\s+(\d+)")]
     private static partial Regex TradeSharesRegex();
 
+    // BUY: Price
     [GeneratedRegex(@"│\s+Price:\s+\$?([\d.]+)")]
     private static partial Regex TradePriceRegex();
 
+    // BUY: Cost
     [GeneratedRegex(@"│\s+Cost:\s+\$?([\d.]+)")]
     private static partial Regex TradeCostRegex();
 
+    // BUY: Edge: 18.5 % (yours=22.9 % vs market=4.5 %)
     [GeneratedRegex(@"│\s+Edge:\s+([\d.]+)\s*%\s*\(yours=([\d.]+)\s*%\s*vs\s+market=([\d.]+)\s*%\)")]
-    private static partial Regex TradeEdgeRegex();
+    private static partial Regex TradeBuyEdgeRegex();
 
+    // BUY: Kelly
     [GeneratedRegex(@"│\s+Kelly:\s+raw=([\d.]+)\s*%,?\s*adj=([\d.]+)\s*%")]
     private static partial Regex TradeKellyRegex();
+
+    // SELL: Entry price
+    [GeneratedRegex(@"│\s+Entry:\s+\$?([\d.]+)")]
+    private static partial Regex TradeEntryPriceRegex();
+
+    // SELL: Current price
+    [GeneratedRegex(@"│\s+Current:\s+\$?([\d.]+)")]
+    private static partial Regex TradeCurrentPriceRegex();
+
+    // SELL: P&L: +$0.02 (+6.3 %)
+    [GeneratedRegex(@"│\s+P&L:\s+([+-]?\$?[\d.]+)\s+\(([+-]?[\d.]+)\s*%\)")]
+    private static partial Regex TradePnLRegex();
+
+    // SELL: Edge: -1.5 % | Reason: Edge flip
+    [GeneratedRegex(@"│\s+Edge:\s+([+-]?[\d.]+\s*%)\s*\|\s*Reason:\s*(.+)")]
+    private static partial Regex TradeSellEdgeRegex();
 
     [GeneratedRegex(@"│\s+OrderId:\s+(0x[0-9a-fA-F]+)")]
     private static partial Regex TradeOrderIdRegex();
@@ -136,7 +157,8 @@ public sealed partial class TradingLogService : ITradingLogService
                 currentTrade = new TradeEntry
                 {
                     Type = headerMatch.Groups[1].Value,
-                    Mode = headerMatch.Groups[2].Value
+                    Mode = headerMatch.Groups[2].Value,
+                    Outcome = headerMatch.Groups[3].Value
                 };
                 continue;
             }
@@ -180,13 +202,14 @@ public sealed partial class TradingLogService : ITradingLogService
         m = TradeSharesRegex().Match(line);
         if (m.Success) { trade.Shares = int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture); return; }
 
+        // BUY-specific fields
         m = TradePriceRegex().Match(line);
         if (m.Success) { trade.Price = decimal.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture); return; }
 
         m = TradeCostRegex().Match(line);
         if (m.Success) { trade.Cost = decimal.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture); return; }
 
-        m = TradeEdgeRegex().Match(line);
+        m = TradeBuyEdgeRegex().Match(line);
         if (m.Success)
         {
             trade.EdgePercent = double.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture);
@@ -200,6 +223,32 @@ public sealed partial class TradingLogService : ITradingLogService
         {
             trade.KellyRawPercent = double.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture);
             trade.KellyAdjPercent = double.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture);
+            return;
+        }
+
+        // SELL-specific fields
+        m = TradeEntryPriceRegex().Match(line);
+        if (m.Success) { trade.EntryPrice = decimal.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture); return; }
+
+        m = TradeCurrentPriceRegex().Match(line);
+        if (m.Success) { trade.CurrentPrice = decimal.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture); return; }
+
+        m = TradePnLRegex().Match(line);
+        if (m.Success)
+        {
+            var raw = m.Groups[1].Value.Replace("$", "").Trim();
+            if (decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var pnl))
+                trade.PnLAmount = pnl;
+            if (double.TryParse(m.Groups[2].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var pnlPct))
+                trade.PnLPercent = pnlPct;
+            return;
+        }
+
+        m = TradeSellEdgeRegex().Match(line);
+        if (m.Success)
+        {
+            trade.SellEdgeRaw = m.Groups[1].Value.Trim();
+            trade.SellReason = m.Groups[2].Value.Trim();
             return;
         }
 
