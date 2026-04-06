@@ -60,8 +60,8 @@ public sealed partial class TradingLogService : ITradingLogService
     [GeneratedRegex(@"│\s+Current:\s+\$?([\d.]+)")]
     private static partial Regex TradeCurrentPriceRegex();
 
-    // SELL: P&L: +$0.02 (+6.3 %)
-    [GeneratedRegex(@"│\s+P&L:\s+([+-]?\$?[\d.]+)\s+\(([+-]?[\d.]+)\s*%\)")]
+    // SELL: P&L: +$0.02 (+6.3 %) or $-0.50 (-10.2 %)
+    [GeneratedRegex(@"│\s+P&L:\s+([+-]?\$?[+-]?[\d.]+)\s+\(([+-]?[\d.]+)\s*%\)")]
     private static partial Regex TradePnLRegex();
 
     // SELL: Edge: -1.5 % | Reason: Edge flip
@@ -80,7 +80,7 @@ public sealed partial class TradingLogService : ITradingLogService
     [GeneratedRegex(@"Winrate:\s+([\d.]+)\s*%")]
     private static partial Regex SummaryWinrateRegex();
 
-    [GeneratedRegex(@"Total P&L:\s+([+-]?\$?[\d.]+)")]
+    [GeneratedRegex(@"Total P&L:\s+([+-]?\$?[+-]?[\d.]+)")]
     private static partial Regex SummaryPnlRegex();
 
     public TradingLogService(IConfiguration configuration)
