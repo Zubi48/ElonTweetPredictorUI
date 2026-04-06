@@ -104,10 +104,19 @@ else
                 <div class="trade-list">
                     @foreach (var trade in Enumerable.Reverse(_session.Trades))
                     {
-                        <div class="trade-card @(trade.IsBuy ? "trade-buy" : trade.IsWin ? "trade-win" : "trade-sell")">
+                        var cardClass = trade.IsBuy ? "trade-buy"
+                            : trade.IsAdjustment ? "trade-adjustment"
+                            : trade.IsWin ? "trade-win"
+                            : trade.IsSync ? "trade-sync"
+                            : "trade-sell";
+                        var typeBadge = trade.IsBuy ? "bg-success"
+                            : trade.IsAdjustment ? "bg-warning"
+                            : "bg-danger";
+
+                        <div class="trade-card @cardClass">
                             <div class="trade-header">
                                 <div class="d-flex align-items-center gap-2">
-                                    <span class="badge @(trade.IsBuy ? "bg-success" : "bg-danger")">@trade.Type</span>
+                                    <span class="badge @typeBadge">@trade.Type</span>
                                     <span class="badge bg-secondary">@trade.Mode</span>
                                     @if (!string.IsNullOrEmpty(trade.Outcome))
                                     {
@@ -146,8 +155,41 @@ else
                                             <span class="text-muted ms-1">(raw @trade.KellyRawPercent.ToString("F1")%)</span>
                                         </div>
                                     }
+                                    else if (trade.IsSync && !trade.HasPnL)
+                                    {
+                                        @* SYNC sell with unknown exit — no P&L data *@
+                                        <div class="col-6 col-md-3">
+                                            <span class="text-muted">Shares:</span>
+                                            <span class="fw-semibold ms-1">@trade.Shares</span>
+                                        </div>
+                                        <div class="col-6 col-md-3">
+                                            <span class="text-muted">Entry:</span>
+                                            <span class="fw-semibold ms-1">$@trade.EntryPrice.ToString("F4")</span>
+                                        </div>
+                                        @if (!string.IsNullOrEmpty(trade.ExitInfo))
+                                        {
+                                            <div class="col-6 col-md-3">
+                                                <span class="text-muted">Exit:</span>
+                                                <span class="fw-semibold text-warning ms-1">@trade.ExitInfo</span>
+                                            </div>
+                                        }
+                                        @if (!string.IsNullOrEmpty(trade.SellReason))
+                                        {
+                                            <div class="col-12">
+                                                <span class="text-muted">Reason:</span>
+                                                <span class="text-warning ms-1">@trade.SellReason</span>
+                                            </div>
+                                        }
+                                        @if (!string.IsNullOrEmpty(trade.Note))
+                                        {
+                                            <div class="col-12">
+                                                <span class="text-muted fst-italic">@trade.Note</span>
+                                            </div>
+                                        }
+                                    }
                                     else
                                     {
+                                        @* Regular SELL / ADJUSTMENT with P&L data *@
                                         <div class="col-6 col-md-3">
                                             <span class="text-muted">Shares:</span>
                                             <span class="fw-semibold ms-1">@trade.Shares</span>
@@ -168,10 +210,13 @@ else
                                                 (@(trade.PnLPercent >= 0 ? "+" : "")@trade.PnLPercent.ToString("F1")%)
                                             </span>
                                         </div>
-                                        <div class="col-6 col-md-3">
-                                            <span class="text-muted">Edge:</span>
-                                            <span class="fw-semibold ms-1">@trade.SellEdgeRaw</span>
-                                        </div>
+                                        @if (!string.IsNullOrEmpty(trade.SellEdgeRaw))
+                                        {
+                                            <div class="col-6 col-md-3">
+                                                <span class="text-muted">Edge:</span>
+                                                <span class="fw-semibold ms-1">@trade.SellEdgeRaw</span>
+                                            </div>
+                                        }
                                         @if (!string.IsNullOrEmpty(trade.SellReason))
                                         {
                                             <div class="col-6 col-md-3">

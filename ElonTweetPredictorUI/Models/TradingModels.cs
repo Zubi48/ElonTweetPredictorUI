@@ -28,9 +28,14 @@ public class TradeEntry
     public double PnLPercent { get; set; }
     public string SellEdgeRaw { get; set; } = "";
     public string SellReason { get; set; } = "";
+    public string ExitInfo { get; set; } = "";
+    public string Note { get; set; } = "";
+    public bool IsSync => Mode.Equals("SYNC", StringComparison.OrdinalIgnoreCase);
+    public bool HasPnL => CurrentPrice != 0 || PnLAmount != 0;
 
     public bool IsBuy => Type.Equals("BUY", StringComparison.OrdinalIgnoreCase);
     public bool IsSell => Type.Equals("SELL", StringComparison.OrdinalIgnoreCase);
+    public bool IsAdjustment => Type.Equals("ADJUSTMENT", StringComparison.OrdinalIgnoreCase);
     public bool IsWin => Outcome.Equals("WIN", StringComparison.OrdinalIgnoreCase);
 }
 

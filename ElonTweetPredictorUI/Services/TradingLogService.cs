@@ -68,6 +68,18 @@ public sealed partial class TradingLogService : ITradingLogService
     [GeneratedRegex(@"│\s+Edge:\s+([+-]?[\d.]+\s*%)\s*\|\s*Reason:\s*(.+)")]
     private static partial Regex TradeSellEdgeRegex();
 
+    // SYNC: Exit: UNKNOWN (external) or Exit: $0.05
+    [GeneratedRegex(@"│\s+Exit:\s+(.+)")]
+    private static partial Regex TradeExitRegex();
+
+    // SYNC/SELL: standalone Reason: line
+    [GeneratedRegex(@"│\s+Reason:\s+(.+)")]
+    private static partial Regex TradeReasonRegex();
+
+    // SYNC: Note: line (may be multi-line, capture first line)
+    [GeneratedRegex(@"│\s+Note:\s+(.+)")]
+    private static partial Regex TradeNoteRegex();
+
     [GeneratedRegex(@"│\s+OrderId:\s+(0x[0-9a-fA-F]+)")]
     private static partial Regex TradeOrderIdRegex();
 
@@ -237,6 +249,18 @@ public sealed partial class TradingLogService : ITradingLogService
             trade.SellReason = m.Groups[2].Value.Trim();
             return;
         }
+
+        // SYNC: Exit info
+        m = TradeExitRegex().Match(line);
+        if (m.Success) { trade.ExitInfo = m.Groups[1].Value.Trim(); return; }
+
+        // Standalone Reason: (SYNC sells — must be after TradeSellEdgeRegex)
+        m = TradeReasonRegex().Match(line);
+        if (m.Success) { trade.SellReason = m.Groups[1].Value.Trim(); return; }
+
+        // Note: line
+        m = TradeNoteRegex().Match(line);
+        if (m.Success) { trade.Note = m.Groups[1].Value.Trim(); return; }
 
         m = TradeOrderIdRegex().Match(line);
         if (m.Success) { trade.OrderId = m.Groups[1].Value.Trim(); return; }
