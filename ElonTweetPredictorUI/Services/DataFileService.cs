@@ -24,7 +24,7 @@ public class DataFileService : IDataFileService
     public async Task<DataFileDownloadResult?> ResolveAsync(string fileType)
     {
         var normalized = fileType.Trim().ToLowerInvariant();
-        if (normalized is not ("csv" or "log" or "predictorlog" or "logsjson" or "model" or "tradeslog"))
+        if (normalized is not ("csv" or "log" or "predictorlog" or "logsjson" or "model" or "tradeslog" or "sleeplog"))
         {
             return null;
         }
@@ -61,6 +61,7 @@ public class DataFileService : IDataFileService
 
             return new DataFileDownloadResult(tradesPath, "text/plain", "trades.log");
         }
+        if (normalized == "logsjson")
         {
             var logsJsonPath = Path.Combine(_cachePath, "logs.json");
             if (!File.Exists(logsJsonPath))
