@@ -16,7 +16,7 @@ public partial class SleepService : ISleepService
     public SleepService(IConfiguration configuration)
     {
         var dataPath = configuration["DataPath"] ?? "/app/data";
-        _filePath = Path.Combine(dataPath, "sleep_wake.log");
+        _filePath = Path.Combine(dataPath, "sleep_analysis.log");
     }
 
     // Matches a FULL SLEEP PERIOD LOG data row:
