@@ -19,7 +19,11 @@ public partial class SleepService : ISleepService
         _filePath = Path.Combine(dataPath, "sleep_analysis.log");
     }
 
-    // Matches a FULL SLEEP PERIOD LOG data row:
+    // Strips the log line prefix: "2026-05-02 17:14:09,818 [INFO]   " → captures everything after [LEVEL]
+    [GeneratedRegex(@"^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2},\d+\s+\[\w+\]\s*(.*)$", RegexOptions.Compiled)]
+    private static partial Regex LogPrefixRegex();
+
+    // Matches a FULL SLEEP PERIOD LOG data row (after prefix stripped):
     // e.g.  "  2025-11-02   Sunday      02:39 AM EST 08:46 AM EST     6.1        2         1"
     [GeneratedRegex(
         @"^\s*(\d{4}-\d{2}-\d{2})\s+(\w+)\s+(\d{2}:\d{2}\s+[AP]M\s+EST)\s+(\d{2}:\d{2}\s+[AP]M\s+EST)\s+([\d.]+)\s+(\d+)\s+(\d+)",
@@ -39,9 +43,14 @@ public partial class SleepService : ISleepService
     [GeneratedRegex(@"Total sleep periods detected\s*:\s*(\d+)", RegexOptions.Compiled)]
     private static partial Regex TotalRegex();
 
-    // Matches extreme lines
+    // Matches extreme lines, e.g.:
+    // "  Latest bedtime   : Thursday 2026-04-30  Sleep=03:57 AM EST  Wake=11:01 AM EST  Duration=7.1h"
     [GeneratedRegex(@"(Latest bedtime|Earliest bedtime|Earliest wake-up|Latest wake-up|Longest sleep|Shortest sleep)\s*:\s+(.+)", RegexOptions.Compiled)]
     private static partial Regex ExtremeRegex();
+
+    // Parses the extreme value: "Thursday 2026-04-30  Sleep=03:57 AM EST  Wake=11:01 AM EST  Duration=7.1h"
+    [GeneratedRegex(@"(\w+)\s+(\d{4}-\d{2}-\d{2})\s+Sleep=(\d{2}:\d{2}\s+[AP]M\s+EST)\s+Wake=(\d{2}:\d{2}\s+[AP]M\s+EST)\s+Duration=([\d.]+h)", RegexOptions.Compiled)]
+    private static partial Regex ExtremeValueRegex();
 
     public async Task<SleepData?> GetSleepDataAsync()
     {
@@ -69,7 +78,11 @@ public partial class SleepService : ISleepService
 
         foreach (var raw in lines)
         {
-            var line = raw.TrimEnd('\r');
+            var rawLine = raw.TrimEnd('\r');
+
+            // Strip the log timestamp prefix if present: "2026-05-02 17:14:09,818 [INFO]   content"
+            var prefixMatch = LogPrefixRegex().Match(rawLine);
+            var line = prefixMatch.Success ? prefixMatch.Groups[1].Value : rawLine;
 
             // Total sleep periods
             var totalMatch = TotalRegex().Match(line);
@@ -141,15 +154,20 @@ public partial class SleepService : ISleepService
             if (extMatch.Success)
             {
                 var kind = extMatch.Groups[1].Value;
-                var val = extMatch.Groups[2].Value.Trim();
+                var rawVal = extMatch.Groups[2].Value.Trim();
+                // Parse into clean format: "Thu 2026-04-30  💤 03:57 AM  ☀️ 11:01 AM  (7.1h)"
+                var ev = ExtremeValueRegex().Match(rawVal);
+                var val = ev.Success
+                    ? $"{ev.Groups[1].Value} {ev.Groups[2].Value}  💤 {ev.Groups[3].Value.Replace(" EST","")}  ☀️ {ev.Groups[4].Value.Replace(" EST","")}  ({ev.Groups[5].Value})"
+                    : rawVal;
                 switch (kind)
                 {
-                    case "Latest bedtime": data.Extremes.LatestBedtime = val; break;
+                    case "Latest bedtime":   data.Extremes.LatestBedtime   = val; break;
                     case "Earliest bedtime": data.Extremes.EarliestBedtime = val; break;
-                    case "Earliest wake-up": data.Extremes.EarliestWakeUp = val; break;
-                    case "Latest wake-up": data.Extremes.LatestWakeUp = val; break;
-                    case "Longest sleep": data.Extremes.LongestSleep = val; break;
-                    case "Shortest sleep": data.Extremes.ShortestSleep = val; break;
+                    case "Earliest wake-up": data.Extremes.EarliestWakeUp  = val; break;
+                    case "Latest wake-up":   data.Extremes.LatestWakeUp    = val; break;
+                    case "Longest sleep":    data.Extremes.LongestSleep    = val; break;
+                    case "Shortest sleep":   data.Extremes.ShortestSleep   = val; break;
                 }
             }
         }
