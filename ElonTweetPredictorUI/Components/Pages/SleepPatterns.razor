@@ -1,0 +1,342 @@
+@page "/sleep-patterns"
+@rendermode InteractiveServer
+@inject ISleepService SleepService
+
+<PageTitle>Sleep / Wake Patterns</PageTitle>
+
+@if (_loading)
+{
+    <div class="loading-container">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading…</span>
+        </div>
+        <p class="mt-3 text-muted">Loading sleep data…</p>
+    </div>
+}
+else if (_data is null)
+{
+    <div class="alert alert-warning mt-3" role="alert">
+        <h6 class="alert-heading mb-2">No sleep data available</h6>
+        <p class="mb-0">
+            The UI cannot find <code>sleep_wake.log</code> in the shared data volume (<code>/app/data</code>).
+            Make sure the Python sleep-analysis script has run at least once.
+        </p>
+    </div>
+}
+else
+{
+    <!-- ── Status bar ── -->
+    <div class="status-bar mb-3">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <span class="badge bg-secondary">SLEEP ANALYSIS</span>
+                <span class="text-muted small ms-2">@_data.TotalSleepPeriods sleep periods detected</span>
+            </div>
+            <div class="text-muted small">Parsed @_data.ParsedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</div>
+        </div>
+    </div>
+
+    <!-- ── Polymarket signal card ── -->
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <div class="signal-card @(_signal.CssClass)">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="signal-icon">@_signal.Icon</div>
+                    <div>
+                        <div class="signal-title">@_signal.Title</div>
+                        <div class="signal-detail">@_signal.Detail</div>
+                    </div>
+                    <div class="ms-auto text-end">
+                        <div class="signal-prob">@_signal.AwakeProbability%</div>
+                        <div class="text-muted small">chance awake</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Key metric cards ── -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="metric-card text-center">
+                <div class="metric-label">Avg Bedtime</div>
+                <div class="metric-value text-info">@_avgBedtime</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="metric-card text-center">
+                <div class="metric-label">Avg Wake-Up</div>
+                <div class="metric-value text-success">@_avgWakeUp</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="metric-card text-center">
+                <div class="metric-label">Avg Sleep</div>
+                <div class="metric-value">@_avgSleep.ToString("F1") hrs</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="metric-card text-center">
+                <div class="metric-label">Latest Period</div>
+                <div class="metric-value text-warning">@(_data.Periods.LastOrDefault()?.Date.ToString("MM/dd") ?? "—")</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Extremes ── -->
+    @if (_data.Extremes is { } ex)
+    {
+        <div class="card bg-dark border-secondary mb-4">
+            <div class="card-body">
+                <h6 class="card-title mb-3">🏆 All-Time Extremes</h6>
+                <div class="row g-2 extremes-grid">
+                    <div class="col-6 col-md-4"><div class="extreme-item"><span class="extreme-label">🌙 Latest bedtime</span><span class="extreme-value text-danger">@ex.LatestBedtime</span></div></div>
+                    <div class="col-6 col-md-4"><div class="extreme-item"><span class="extreme-label">🌙 Earliest bedtime</span><span class="extreme-value text-success">@ex.EarliestBedtime</span></div></div>
+                    <div class="col-6 col-md-4"><div class="extreme-item"><span class="extreme-label">☀️ Latest wake-up</span><span class="extreme-value text-warning">@ex.LatestWakeUp</span></div></div>
+                    <div class="col-6 col-md-4"><div class="extreme-item"><span class="extreme-label">☀️ Earliest wake-up</span><span class="extreme-value text-info">@ex.EarliestWakeUp</span></div></div>
+                    <div class="col-6 col-md-4"><div class="extreme-item"><span class="extreme-label">😴 Longest sleep</span><span class="extreme-value text-primary">@ex.LongestSleep</span></div></div>
+                    <div class="col-6 col-md-4"><div class="extreme-item"><span class="extreme-label">⚡ Shortest sleep</span><span class="extreme-value text-danger">@ex.ShortestSleep</span></div></div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- ── Per-week averages ── -->
+    @if (_data.WeekSummaries.Count > 0)
+    {
+        <div class="card bg-dark border-secondary mb-4">
+            <div class="card-body">
+                <h6 class="card-title mb-3">📅 Weekly Averages</h6>
+                <div class="table-responsive">
+                    <table class="table table-dark table-sm table-striped mb-0 sleep-table">
+                        <thead>
+                            <tr>
+                                <th>Week</th>
+                                <th>Nights</th>
+                                <th>Weekdays</th>
+                                <th>Avg Bedtime</th>
+                                <th>Avg Wake-Up</th>
+                                <th>Avg Sleep</th>
+                                <th>Rating</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var w in _data.WeekSummaries.AsEnumerable().Reverse())
+                            {
+                                <tr>
+                                    <td class="text-muted">@w.WeekLabel</td>
+                                    <td>@w.Nights</td>
+                                    <td class="text-muted small">@w.Weekdays</td>
+                                    <td class="text-info">@w.AvgBedtime</td>
+                                    <td class="text-success">@w.AvgWakeUp</td>
+                                    <td class="@SleepColorClass(w.AvgSleepHours)">@w.AvgSleepHours.ToString("F1") hrs</td>
+                                    <td>@SleepRatingBadge(w.AvgSleepHours)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- ── Full sleep log ── -->
+    <div class="card bg-dark border-secondary mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <h6 class="card-title mb-0">🛏️ Full Sleep Period Log (@_data.Periods.Count entries)</h6>
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <select class="form-select form-select-sm bg-dark text-light border-secondary" style="width:auto"
+                            @bind="_weekdayFilter">
+                        <option value="">All Weekdays</option>
+                        @foreach (var d in _weekdays)
+                        {
+                            <option value="@d">@d</option>
+                        }
+                    </select>
+                    <select class="form-select form-select-sm bg-dark text-light border-secondary" style="width:auto"
+                            @bind="_durationFilter">
+                        <option value="">All Durations</option>
+                        <option value="short">&lt; 5 hrs</option>
+                        <option value="normal">5–7 hrs</option>
+                        <option value="long">&gt; 7 hrs</option>
+                    </select>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-dark table-sm table-hover mb-0 sleep-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Weekday</th>
+                            <th>Bedtime</th>
+                            <th>Wake-Up</th>
+                            <th>Duration</th>
+                            <th title="Tweets just before sleep">Bed 🐦</th>
+                            <th title="Tweets just after waking">Dawn 🐦</th>
+                            <th>Signal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in FilteredPeriods())
+                        {
+                            <tr>
+                                <td>@p.Date.ToString("yyyy-MM-dd")</td>
+                                <td class="text-muted">@p.Weekday</td>
+                                <td class="text-info">@p.BedtimeStr</td>
+                                <td class="text-success">@p.WakeTimeStr</td>
+                                <td class="@SleepColorClass(p.DurationHours)">@p.DurationHours.ToString("F1") hrs</td>
+                                <td>@p.BedTweets</td>
+                                <td>@p.MornTweets</td>
+                                <td>@TweetSignalBadge(p)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private SleepData? _data;
+    private string _weekdayFilter = "";
+    private string _durationFilter = "";
+
+    // computed summaries
+    private string _avgBedtime = "—";
+    private string _avgWakeUp = "—";
+    private double _avgSleep;
+    private PolymarketSignal _signal = new();
+
+    private static readonly string[] _weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _data = await SleepService.GetSleepDataAsync();
+        if (_data is not null)
+            ComputeSummaries();
+        _loading = false;
+    }
+
+    private void ComputeSummaries()
+    {
+        if (_data!.Periods.Count == 0) return;
+
+        // Average bed/wake across all periods
+        var bedMinutes = _data.Periods.Select(p => p.Bedtime.Hour * 60 + p.Bedtime.Minute).Average();
+        var wakeMinutes = _data.Periods.Select(p => p.WakeTime.Hour * 60 + p.WakeTime.Minute).Average();
+        _avgBedtime = MinutesToAmPm((int)bedMinutes);
+        _avgWakeUp = MinutesToAmPm((int)wakeMinutes);
+        _avgSleep = _data.Periods.Select(p => p.DurationHours).Average();
+
+        _signal = ComputePolymarketSignal();
+    }
+
+    private PolymarketSignal ComputePolymarketSignal()
+    {
+        // Work in EST (UTC-5, no DST for simplicity; log already labels EST)
+        var estNow = TimeZoneInfo.ConvertTimeBySystemTimeZoneId(DateTime.UtcNow, "Eastern Standard Time");
+        var nowTime = TimeOnly.FromDateTime(estNow);
+        var todayDow = estNow.DayOfWeek.ToString();
+
+        // Look at periods for the same weekday
+        var sameDayPeriods = _data!.Periods
+            .Where(p => p.Weekday.Equals(todayDow, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (sameDayPeriods.Count == 0)
+            return new PolymarketSignal
+            {
+                Icon = "❓", Title = "Insufficient data for today",
+                Detail = $"No historical data for {todayDow}.",
+                AwakeProbability = 50, CssClass = "signal-neutral"
+            };
+
+        // Count how many of those same-weekday periods were sleeping at this time
+        int sleeping = 0;
+        foreach (var p in sameDayPeriods)
+        {
+            // Sleep window: bedtime → waketime (can cross midnight)
+            bool asleep;
+            if (p.Bedtime <= p.WakeTime)
+                asleep = nowTime >= p.Bedtime && nowTime < p.WakeTime;
+            else // crosses midnight
+                asleep = nowTime >= p.Bedtime || nowTime < p.WakeTime;
+
+            if (asleep) sleeping++;
+        }
+
+        var sleepPct = (int)Math.Round(100.0 * sleeping / sameDayPeriods.Count);
+        var awakePct = 100 - sleepPct;
+
+        string icon, title, detail, css;
+        if (awakePct >= 80)       { icon = "🟢"; title = "Very likely AWAKE"; css = "signal-awake-strong"; }
+        else if (awakePct >= 60)  { icon = "🟡"; title = "Probably awake"; css = "signal-awake"; }
+        else if (awakePct >= 40)  { icon = "🟠"; title = "Uncertain"; css = "signal-neutral"; }
+        else if (awakePct >= 20)  { icon = "🔴"; title = "Probably SLEEPING"; css = "signal-sleep"; }
+        else                      { icon = "🌑"; title = "Very likely SLEEPING"; css = "signal-sleep-strong"; }
+
+        var estStr = estNow.ToString("hh:mm tt");
+        detail = $"Current EST: {todayDow} {estStr} — {sleeping}/{sameDayPeriods.Count} historical {todayDow}s Elon was sleeping at this time.";
+
+        return new PolymarketSignal { Icon = icon, Title = title, Detail = detail, AwakeProbability = awakePct, CssClass = css };
+    }
+
+    private IEnumerable<SleepPeriod> FilteredPeriods()
+    {
+        var result = _data!.Periods.AsEnumerable().Reverse();
+
+        if (!string.IsNullOrEmpty(_weekdayFilter))
+            result = result.Where(p => p.Weekday == _weekdayFilter);
+
+        result = _durationFilter switch
+        {
+            "short"  => result.Where(p => p.DurationHours < 5),
+            "normal" => result.Where(p => p.DurationHours >= 5 && p.DurationHours <= 7),
+            "long"   => result.Where(p => p.DurationHours > 7),
+            _        => result
+        };
+
+        return result;
+    }
+
+    private static string SleepColorClass(double hrs) =>
+        hrs < 5 ? "text-danger" : hrs > 7 ? "text-success" : "text-warning";
+
+    private static string SleepRatingBadge(double hrs)
+    {
+        if (hrs >= 8) return "🌟 Well rested";
+        if (hrs >= 6) return "✅ OK";
+        if (hrs >= 4) return "⚠️ Short";
+        return "🔴 Very short";
+    }
+
+    private static string TweetSignalBadge(SleepPeriod p)
+    {
+        var total = p.BedTweets + p.MornTweets;
+        if (p.BedTweets >= 10)  return "🌙 Active pre-sleep";
+        if (p.MornTweets >= 15) return "⚡ Burst at wake";
+        if (total >= 20)        return "🔥 High activity";
+        return "—";
+    }
+
+    private static string MinutesToAmPm(int totalMinutes)
+    {
+        totalMinutes = ((totalMinutes % 1440) + 1440) % 1440;
+        var h = totalMinutes / 60;
+        var m = totalMinutes % 60;
+        var t = new TimeOnly(h, m);
+        return t.ToString("hh:mm tt");
+    }
+
+    private record PolymarketSignal
+    {
+        public string Icon { get; init; } = "❓";
+        public string Title { get; init; } = "";
+        public string Detail { get; init; } = "";
+        public int AwakeProbability { get; init; }
+        public string CssClass { get; init; } = "signal-neutral";
+    }
+}

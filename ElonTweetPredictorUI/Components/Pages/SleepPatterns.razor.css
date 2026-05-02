@@ -1,0 +1,61 @@
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 40vh;
+}
+
+/* ── Polymarket signal card ── */
+.signal-card {
+    border-radius: 0.5rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid transparent;
+}
+
+.signal-awake-strong  { background: rgba(25, 135, 84, 0.20);  border-color: #198754; }
+.signal-awake         { background: rgba(255, 193, 7, 0.15);  border-color: #ffc107; }
+.signal-neutral       { background: rgba(108, 117, 125, 0.20); border-color: #6c757d; }
+.signal-sleep         { background: rgba(220, 53, 69, 0.15);  border-color: #dc3545; }
+.signal-sleep-strong  { background: rgba(13, 17, 23, 0.60);   border-color: #6610f2; }
+
+.signal-icon   { font-size: 2.2rem; line-height: 1; }
+.signal-title  { font-size: 1.1rem; font-weight: 600; color: #f8f9fa; }
+.signal-detail { font-size: 0.82rem; color: #adb5bd; margin-top: 0.2rem; }
+.signal-prob   { font-size: 1.8rem; font-weight: 700; color: #f8f9fa; line-height: 1; }
+
+/* ── Metric cards (reuse app-wide style if available) ── */
+.metric-card {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 0.5rem;
+    padding: 0.85rem 0.5rem;
+}
+
+.metric-label  { font-size: 0.72rem; text-transform: uppercase; color: #6c757d; letter-spacing: 0.05em; }
+.metric-value  { font-size: 1.35rem; font-weight: 600; color: #f8f9fa; }
+
+/* ── Extremes grid ── */
+.extreme-item {
+    display: flex;
+    flex-direction: column;
+    background: rgba(255,255,255,0.04);
+    border-radius: 0.35rem;
+    padding: 0.5rem 0.75rem;
+}
+.extreme-label { font-size: 0.72rem; color: #6c757d; }
+.extreme-value { font-size: 0.88rem; font-weight: 500; word-break: break-word; }
+
+/* ── Sleep table ── */
+.sleep-table { font-size: 0.82rem; }
+.sleep-table th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: #6c757d; border-color: rgba(255,255,255,0.1) !important; }
+.sleep-table td { border-color: rgba(255,255,255,0.06) !important; vertical-align: middle; }
+
+/* ── Status bar ── */
+.status-bar {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 0.4rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.82rem;
+}
