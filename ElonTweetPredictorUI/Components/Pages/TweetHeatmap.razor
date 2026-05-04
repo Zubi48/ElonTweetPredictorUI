@@ -1,0 +1,220 @@
+@page "/tweet-heatmap"
+@rendermode InteractiveServer
+@inject ITweetHeatmapService TweetHeatmapService
+@inject ISleepService SleepService
+
+<PageTitle>Tweet Activity Heatmap</PageTitle>
+
+@if (_loading)
+{
+    <div class="loading-container">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading…</span>
+        </div>
+        <p class="mt-3 text-muted">Loading heatmap data…</p>
+    </div>
+}
+else if (_heatmap is null)
+{
+    <div class="alert alert-warning mt-3" role="alert">
+        <h6 class="alert-heading mb-2">No tweet data available</h6>
+        <p class="mb-0">
+            The UI cannot find the tweet CSV in the shared data volume (<code>/app/data</code>).
+            Verify the Python predictor container is running and the volume is mounted correctly.
+        </p>
+    </div>
+}
+else
+{
+    <div class="status-bar mb-3">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <span class="badge bg-secondary">TWEET HEATMAP</span>
+                <span class="text-muted small ms-2">
+                    @_heatmap.Days.Sum(d => d.Total) tweets shown &nbsp;·&nbsp;
+                    Peak hour: @_heatmap.HourlyAvg
+                        .Select((v, i) => (v, i))
+                        .OrderByDescending(x => x.v)
+                        .First().i.ToString("D2"):00 EST
+                </span>
+            </div>
+            <div class="text-muted small">All times in EST</div>
+        </div>
+    </div>
+
+    <div class="card bg-dark border-secondary mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <h6 class="card-title mb-0">🔥 Hourly Tweet Activity (EST)</h6>
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <div class="heatmap-legend">
+                        <span class="legend-dot legend-sleep"></span>
+                        <span class="text-muted small">Sleep window</span>
+                        <span class="legend-box legend-current ms-2"></span>
+                        <span class="text-muted small">Current hour</span>
+                    </div>
+                    <div class="btn-group btn-group-sm" role="group">
+                        @foreach (var d in new[] { 3, 7, 14, 30 })
+                        {
+                            <button type="button"
+                                    class="btn @(_days == d ? "btn-primary" : "btn-outline-secondary")"
+                                    @onclick="() => ChangeDays(d)">@d&#8201;d</button>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="heatmap-scroll">
+                <table class="heatmap-table">
+                    <thead>
+                        <tr>
+                            <th class="heatmap-hour-label"></th>
+                            @foreach (var col in _heatmap.Days)
+                            {
+                                <th class="heatmap-day-header @(col.IsToday ? "heatmap-today" : "")">
+                                    <div>@col.DayLabel</div>
+                                    <div class="heatmap-day-num">@col.DayNumber</div>
+                                </th>
+                            }
+                            <th class="heatmap-day-header heatmap-avg">AVG<div class="heatmap-day-num">—</div></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (var h = 0; h < 24; h++)
+                        {
+                            var hour = h;
+                            var avgVal = _heatmap.HourlyAvg[hour];
+                            var overallAvg = _heatmap.HourlyAvg.Average();
+                            <tr>
+                                <td class="heatmap-hour-label @(hour == _heatmap.CurrentHour ? "heatmap-current-hour-label" : "")">
+                                    @hour.ToString("D2"):00
+                                </td>
+                                @foreach (var col in _heatmap.Days)
+                                {
+                                    var count = col.HourCounts[hour];
+                                    var isSleeping = _heatmap.SleepingCells.Contains((col.Date, hour));
+                                    var isCurrentHour = col.IsToday && hour == _heatmap.CurrentHour;
+                                    var intensity = _heatmap.MaxCount > 0 ? (double)count / _heatmap.MaxCount : 0;
+                                    <td class="heatmap-cell @(isSleeping ? "heatmap-sleeping" : "") @(isCurrentHour ? "heatmap-current" : "")"
+                                        style="@CellStyle(count, intensity, isSleeping)"
+                                        title="@col.DayLabel @col.DayNumber, @hour.ToString("D2"):00 EST — @count tweets@(isSleeping ? " (sleep window)" : "")">
+                                        @(count == 0 ? "0" : count.ToString())
+                                    </td>
+                                }
+                                <td class="heatmap-cell heatmap-avg-cell @(avgVal > overallAvg ? "heatmap-avg-above" : "")"
+                                    title="All-time avg @hour.ToString("D2"):00 — @avgVal.ToString("F1") tweets/day">
+                                    @avgVal.ToString("F1")
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td class="heatmap-hour-label text-muted small fw-semibold">Total</td>
+                            @foreach (var col in _heatmap.Days)
+                            {
+                                <td class="heatmap-cell heatmap-total">@col.Total</td>
+                            }
+                            <td class="heatmap-cell heatmap-avg-cell heatmap-total">
+                                @_heatmap.HourlyAvg.Sum().ToString("F1")
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <div class="d-flex gap-4 mt-3 small text-muted flex-wrap align-items-center">
+                <div class="d-flex align-items-center gap-1">
+                    <div class="legend-gradient"></div>
+                    <span>Low</span>
+                    <div class="legend-gradient legend-gradient-high ms-1"></div>
+                    <span>High</span>
+                </div>
+                <span>AVG column highlighted when above daily mean</span>
+                <span class="ms-auto">@_heatmap.Days.Count days · @_heatmap.Days.Sum(d => d.Total) total tweets</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Per-day totals bar chart -->
+    <div class="card bg-dark border-secondary mb-4">
+        <div class="card-body">
+            <h6 class="card-title mb-3">📊 Daily Totals</h6>
+            @{ var maxTotal = _heatmap.Days.Max(d => d.Total); }
+            <div class="d-flex align-items-flex-end gap-1" style="height: 80px;">
+                @foreach (var col in _heatmap.Days)
+                {
+                    var pct = maxTotal > 0 ? (100.0 * col.Total / maxTotal) : 0;
+                    <div class="d-flex flex-column align-items-center flex-grow-1" style="min-width:30px;">
+                        <div class="small text-muted" style="font-size:0.62rem;">@col.Total</div>
+                        <div style="width:100%; height:60px; display:flex; align-items:flex-end;">
+                            <div class="@(col.IsToday ? "bg-warning" : "bg-primary")"
+                                 style="width:100%; height:@pct.ToString("F0", System.Globalization.CultureInfo.InvariantCulture)%; min-height:2px; border-radius:3px 3px 0 0;"></div>
+                        </div>
+                        <div class="text-muted" style="font-size:0.60rem; white-space:nowrap;">@col.DayLabel @col.DayNumber</div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private HeatmapData? _heatmap;
+    private int _days = 7;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+        _loading = false;
+    }
+
+    private async Task ChangeDays(int days)
+    {
+        _days = days;
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        var heatmapTask = TweetHeatmapService.GetHeatmapAsync(_days);
+        var sleepTask   = SleepService.GetSleepDataAsync();
+        await Task.WhenAll(heatmapTask, sleepTask);
+
+        _heatmap = heatmapTask.Result;
+        if (_heatmap is not null && sleepTask.Result is { } sleepData)
+            ApplySleepOverlay(sleepData);
+    }
+
+    private void ApplySleepOverlay(SleepData sleepData)
+    {
+        _heatmap!.SleepingCells.Clear();
+        var byDate = sleepData.Periods.GroupBy(p => p.Date)
+                               .ToDictionary(g => g.Key, g => g.First());
+        foreach (var col in _heatmap.Days)
+        {
+            if (!byDate.TryGetValue(col.Date, out var period)) continue;
+            for (var h = 0; h < 24; h++)
+            {
+                var t = new TimeOnly(h, 0);
+                bool asleep = period.Bedtime <= period.WakeTime
+                    ? t >= period.Bedtime && t < period.WakeTime
+                    : t >= period.Bedtime || t < period.WakeTime;
+                if (asleep)
+                    _heatmap.SleepingCells.Add((col.Date, h));
+            }
+        }
+    }
+
+    private static string CellStyle(int count, double intensity, bool sleeping)
+    {
+        if (sleeping && count == 0)
+            return "background: rgba(80,80,100,0.25); color: #555;";
+        if (count == 0)
+            return "background: rgba(255,255,255,0.04); color: #555;";
+        var green = (int)(80 + intensity * 175);
+        var alpha = 0.25 + intensity * 0.75;
+        return $"background: rgba(0,{green},50,{alpha.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)}); color: #fff; font-weight: 600;";
+    }
+}
