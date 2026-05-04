@@ -42,14 +42,7 @@ else
     <div class="card bg-dark border-secondary mb-4">
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                <h6 class="card-title mb-0">🔥 Hourly Tweet Activity (EST)</h6>
-                <div class="d-flex gap-2 align-items-center flex-wrap">
-                    <div class="heatmap-legend">
-                        <span class="legend-dot legend-sleep"></span>
-                        <span class="text-muted small">Sleep window</span>
-                        <span class="legend-box legend-current ms-2"></span>
-                        <span class="text-muted small">Current hour</span>
-                    </div>
+                <h6 class="card-title mb-0">🔥 Hourly Tweet Activity (EST)</h6>                <div class="d-flex gap-2 align-items-center flex-wrap">
                     <div class="btn-group btn-group-sm" role="group">
                         @foreach (var d in new[] { 3, 7, 14, 30 })
                         {
@@ -121,14 +114,64 @@ else
             </div>
 
             <div class="d-flex gap-4 mt-3 small text-muted flex-wrap align-items-center">
-                <div class="d-flex align-items-center gap-1">
-                    <div class="legend-gradient"></div>
+                <div class="d-flex align-items-center gap-2">
                     <span>Low</span>
-                    <div class="legend-gradient legend-gradient-high ms-1"></div>
+                    <div class="legend-gradient"></div>
                     <span>High</span>
                 </div>
-                <span>AVG column highlighted when above daily mean</span>
+                <div class="d-flex align-items-center gap-1">
+                    <div class="legend-dot legend-sleep"></div>
+                    <span>Sleep window</span>
+                </div>
+                <div class="d-flex align-items-center gap-1">
+                    <div class="legend-box"></div>
+                    <span>Current hour</span>
+                </div>
                 <span class="ms-auto">@_heatmap.Days.Count days · @_heatmap.Days.Sum(d => d.Total) total tweets</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Betting Insights card -->
+    <div class="card bg-dark border-secondary mb-4">
+        <div class="card-body">
+            <h6 class="card-title mb-3">🎯 Polymarket Betting Insights</h6>
+            <div class="row g-3">
+                <div class="col-sm-6 col-lg-3">
+                    <div class="insight-tile">
+                        <div class="insight-label">Activity Level</div>
+                        <div class="insight-value @_activityCssClass">@_activityLevel</div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-lg-3">
+                    <div class="insight-tile">
+                        <div class="insight-label">Recent Trend</div>
+                        <div class="insight-value @_trendCssClass">@_trendLabel</div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-lg-3">
+                    <div class="insight-tile">
+                        <div class="insight-label">Best Bet Window</div>
+                        <div class="insight-value text-info">@_recommendedWindow</div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-lg-3">
+                    <div class="insight-tile">
+                        <div class="insight-label">Most Active Day</div>
+                        <div class="insight-value" style="color: #58a6ff;">@_mostActiveDay</div>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-3">
+                <div class="insight-label mb-1">Top 3 Peak Hours (avg tweets)</div>
+                <div class="d-flex gap-2 flex-wrap">
+                    @foreach (var (hour, avg) in _top3Hours)
+                    {
+                        <span class="peak-hour-badge">
+                            @hour.ToString("D2"):00&nbsp;<span class="badge-count">@avg.ToString("F1")</span>
+                        </span>
+                    }
+                </div>
             </div>
         </div>
     </div>
@@ -162,6 +205,15 @@ else
     private int _days = 7;
     private string _peakHour = "—";
 
+    // Betting insight fields
+    private List<(int Hour, double Avg)> _top3Hours = [];
+    private string _trendLabel = "—";
+    private string _trendCssClass = "text-muted";
+    private string _mostActiveDay = "—";
+    private string _recommendedWindow = "—";
+    private string _activityLevel = "—";
+    private string _activityCssClass = "text-muted";
+
     protected override async Task OnInitializedAsync()
     {
         await LoadDataAsync();
@@ -190,7 +242,73 @@ else
             _peakHour = peak.i.ToString("D2") + ":00";
             if (sleepTask.Result is { } sleepData)
                 ApplySleepOverlay(sleepData);
+
+            ComputeInsights();
         }
+    }
+
+    private void ComputeInsights()
+    {
+        if (_heatmap is null) return;
+
+        // Top 3 peak hours by average
+        _top3Hours = _heatmap.HourlyAvg
+            .Select((avg, h) => (Hour: h, Avg: avg))
+            .OrderByDescending(x => x.Avg)
+            .Take(3)
+            .ToList();
+
+        // Trend: compare last 2 days vs the 2 days before that
+        var days = _heatmap.Days;
+        if (days.Count >= 4)
+        {
+            var recent  = days.TakeLast(2).Average(d => (double)d.Total);
+            var earlier = days.SkipLast(2).TakeLast(2).Average(d => (double)d.Total);
+            if (earlier > 0)
+            {
+                var pct = (recent - earlier) / earlier * 100;
+                _trendLabel    = pct >= 0 ? $"↑ +{pct:F0}% vs prior period" : $"↓ {pct:F0}% vs prior period";
+                _trendCssClass = pct >= 5 ? "text-success" : pct <= -5 ? "text-danger" : "text-warning";
+            }
+            else
+            {
+                _trendLabel = "Insufficient data";
+                _trendCssClass = "text-muted";
+            }
+        }
+
+        // Most active day of week across all data
+        var byDow = days
+            .GroupBy(d => d.Date.DayOfWeek)
+            .Select(g => (Day: g.Key, Avg: g.Average(d => (double)d.Total)))
+            .OrderByDescending(x => x.Avg)
+            .FirstOrDefault();
+        _mostActiveDay = byDow.Day.ToString();
+
+        // Recommended betting window: 3-hour block with highest cumulative avg
+        double bestSum = -1;
+        int bestStart = 0;
+        for (int h = 0; h <= 21; h++)
+        {
+            var s = _heatmap.HourlyAvg[h] + _heatmap.HourlyAvg[h + 1] + _heatmap.HourlyAvg[h + 2];
+            if (s > bestSum) { bestSum = s; bestStart = h; }
+        }
+        _recommendedWindow = $"{bestStart:D2}:00 – {bestStart + 3:D2}:00 EST (~{bestSum:F0} avg tweets)";
+
+        // Overall activity level
+        var overallAvg = _heatmap.HourlyAvg.Sum(); // total tweets per day avg
+        _activityLevel = overallAvg switch
+        {
+            >= 30 => "🔥 HIGH — bet on ≥ 10 tweets",
+            >= 15 => "🟡 MEDIUM — bet on 5–10 tweets",
+            _     => "🔵 LOW — bet on 1–5 tweets"
+        };
+        _activityCssClass = overallAvg switch
+        {
+            >= 30 => "text-danger",
+            >= 15 => "text-warning",
+            _     => "text-info"
+        };
     }
 
     private void ApplySleepOverlay(SleepData sleepData)
