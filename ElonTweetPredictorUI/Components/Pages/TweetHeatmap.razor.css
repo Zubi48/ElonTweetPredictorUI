@@ -154,10 +154,10 @@
     width: 30px;
     height: 10px;
     border-radius: 2px;
-    background: linear-gradient(to right, rgba(0,80,50,0.4), rgba(0,255,50,1));
+    background: linear-gradient(to right, rgba(20,40,80,0.4), rgba(88,166,255,1));
     display: inline-block;
 }
 
 .legend-gradient-high {
-    background: linear-gradient(to right, rgba(0,150,50,0.8), rgba(0,255,80,1));
+    background: linear-gradient(to right, rgba(40,80,160,0.8), rgba(88,166,255,1));
 }

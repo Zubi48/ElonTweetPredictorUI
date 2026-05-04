@@ -32,10 +32,7 @@ else
                 <span class="badge bg-secondary">TWEET HEATMAP</span>
                 <span class="text-muted small ms-2">
                     @_heatmap.Days.Sum(d => d.Total) tweets shown &nbsp;·&nbsp;
-                    Peak hour: @_heatmap.HourlyAvg
-                        .Select((v, i) => (v, i))
-                        .OrderByDescending(x => x.v)
-                        .First().i.ToString("D2"):00 EST
+                    Peak hour: @_peakHour EST
                 </span>
             </div>
             <div class="text-muted small">All times in EST</div>
@@ -163,6 +160,7 @@ else
     private bool _loading = true;
     private HeatmapData? _heatmap;
     private int _days = 7;
+    private string _peakHour = "—";
 
     protected override async Task OnInitializedAsync()
     {
@@ -183,8 +181,16 @@ else
         await Task.WhenAll(heatmapTask, sleepTask);
 
         _heatmap = heatmapTask.Result;
-        if (_heatmap is not null && sleepTask.Result is { } sleepData)
-            ApplySleepOverlay(sleepData);
+        if (_heatmap is not null)
+        {
+            var peak = _heatmap.HourlyAvg
+                .Select((v, i) => (v, i))
+                .OrderByDescending(x => x.v)
+                .First();
+            _peakHour = peak.i.ToString("D2") + ":00";
+            if (sleepTask.Result is { } sleepData)
+                ApplySleepOverlay(sleepData);
+        }
     }
 
     private void ApplySleepOverlay(SleepData sleepData)
@@ -210,11 +216,14 @@ else
     private static string CellStyle(int count, double intensity, bool sleeping)
     {
         if (sleeping && count == 0)
-            return "background: rgba(80,80,100,0.25); color: #555;";
+            return "background: rgba(40,50,80,0.30); color: #444;";
         if (count == 0)
             return "background: rgba(255,255,255,0.04); color: #555;";
-        var green = (int)(80 + intensity * 175);
+        // Blue gradient matching --accent-blue (#58a6ff) at full intensity
+        var r = (int)(20  + intensity * 68);   // 20 → 88
+        var g = (int)(40  + intensity * 126);  // 40 → 166
+        var b = (int)(80  + intensity * 175);  // 80 → 255
         var alpha = 0.25 + intensity * 0.75;
-        return $"background: rgba(0,{green},50,{alpha.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)}); color: #fff; font-weight: 600;";
+        return $"background: rgba({r},{g},{b},{alpha.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)}); color: #fff; font-weight: 600;";
     }
 }
