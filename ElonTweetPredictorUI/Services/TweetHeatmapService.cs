@@ -50,10 +50,6 @@ public class TweetHeatmapService : ITweetHeatmapService
 
         var dateIndex = columns.ToDictionary(c => c.Date);
 
-        // All-time hourly totals for AVG column
-        var allTimeHour = new long[24];
-        var allTimeDays = new HashSet<DateOnly>();
-
         // Parse CSV — we only need the timestamp column
         // Expected format: first column is timestamp in UTC or similar ISO-8601
         // We'll auto-detect the column index by header
@@ -84,16 +80,15 @@ public class TweetHeatmapService : ITweetHeatmapService
             var date = DateOnly.FromDateTime(estDt);
             var hour = estDt.Hour;
 
-            allTimeHour[hour]++;
-            allTimeDays.Add(date);
-
             if (dateIndex.TryGetValue(date, out var col))
                 col.HourCounts[hour]++;
         }
 
-        // Compute averages
-        var totalDays = Math.Max(1, allTimeDays.Count);
-        var hourlyAvg = allTimeHour.Select(c => (double)c / totalDays).ToArray();
+        // Compute averages from the displayed columns only (not all-time history)
+        var totalDays = Math.Max(1, columns.Count);
+        var hourlyAvg = Enumerable.Range(0, 24)
+            .Select(h => (double)columns.Sum(c => c.HourCounts[h]) / totalDays)
+            .ToArray();
 
         var maxCount = columns.SelectMany(c => c.HourCounts).DefaultIfEmpty(0).Max();
 
