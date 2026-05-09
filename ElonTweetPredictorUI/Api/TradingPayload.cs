@@ -55,26 +55,17 @@ public static class TradingPayload
             return new { available = false };
 
         var estNow   = TimeZoneInfo.ConvertTime(DateTime.UtcNow, Est);
-        var today    = DateOnly.FromDateTime(estNow);
         var nowTime  = TimeOnly.FromDateTime(estNow);
 
-        // Most-recent sleep period (may be yesterday's night)
+        // Most-recent sleep period
         var last = data.Periods
             .OrderByDescending(p => p.Date)
             .First();
 
         // Is Elon likely asleep right now?
-        // Use the most-recent known period if its date is today or yesterday.
-        bool? isAsleepNow = null;
-        SleepPeriod? todayPeriod = data.Periods
-            .Where(p => p.Date == today || p.Date == today.AddDays(-1))
-            .OrderByDescending(p => p.Date)
-            .FirstOrDefault();
-
-        if (todayPeriod is not null)
-        {
-            isAsleepNow = IsDuringWindow(nowTime, todayPeriod.Bedtime, todayPeriod.WakeTime);
-        }
+        // Use the rolling 7-night average sleep window projected onto today.
+        // This always produces a result regardless of how stale the last record is.
+        // We compute it after the rolling avg is built below, so defer with a local func.
 
         // Average bedtime/wake from last 7 nights
         var recent = data.Periods
@@ -94,10 +85,15 @@ public static class TradingPayload
         double hoursUntilBed  = HoursUntil(nowTime, expectedBedtime);
         double hoursUntilWake = HoursUntil(nowTime, expectedWakeTime);
 
+        // Derive is_asleep_now from the rolling-avg window (always available)
+        // Falls back to last known period if we have a same/previous-day record
+        bool isAsleepNow = IsDuringWindow(nowTime, expectedBedtime, expectedWakeTime);
+
         return new
         {
             available         = true,
             is_asleep_now     = isAsleepNow,
+            is_asleep_based_on = "rolling_7_night_avg",
             last_known = new
             {
                 date          = last.Date.ToString("yyyy-MM-dd"),
@@ -118,14 +114,11 @@ public static class TradingPayload
         };
     }
 
-    private static string DeriveActivitySignal(bool? asleep, double hBed, double hWake)
+    private static string DeriveActivitySignal(bool asleep, double hBed, double hWake)
     {
-        if (asleep == true)  return "SLEEPING — expect very low tweet volume";
-        if (asleep == false)
-        {
-            if (hBed  < 1.0) return "APPROACHING_SLEEP — activity likely declining";
-            if (hWake < 2.0) return "JUST_WOKE — activity likely ramping up";
-        }
+        if (asleep)          return "SLEEPING — expect very low tweet volume";
+        if (hBed  < 1.0)     return "APPROACHING_SLEEP — activity likely declining";
+        if (hWake < 2.0)     return "JUST_WOKE — activity likely ramping up";
         return "AWAKE — normal activity expected";
     }
 
