@@ -7,10 +7,17 @@ namespace ElonTweetPredictorUI.Hubs;
 public class PredictionHub : Hub
 {
     private readonly IStatusService _statusService;
+    private readonly ISleepService _sleepService;
+    private readonly ITweetHeatmapService _heatmapService;
 
-    public PredictionHub(IStatusService statusService)
+    public PredictionHub(
+        IStatusService statusService,
+        ISleepService sleepService,
+        ITweetHeatmapService heatmapService)
     {
-        _statusService = statusService;
+        _statusService  = statusService;
+        _sleepService   = sleepService;
+        _heatmapService = heatmapService;
     }
 
     /// <summary>
@@ -18,8 +25,15 @@ public class PredictionHub : Hub
     /// </summary>
     public async Task RequestSnapshot()
     {
-        var status = await _statusService.GetStatusAsync();
+        var statusTask  = _statusService.GetStatusAsync();
+        var sleepTask   = _sleepService.GetSleepDataAsync();
+        var heatmapTask = _heatmapService.GetHeatmapAsync(7);
+        await Task.WhenAll(statusTask, sleepTask, heatmapTask);
+
+        var status = statusTask.Result;
         if (status is not null)
-            await Clients.Caller.SendAsync("PredictionUpdated", TradingPayload.Build(status));
+            await Clients.Caller.SendAsync(
+                "PredictionUpdated",
+                TradingPayload.Build(status, sleepTask.Result, heatmapTask.Result));
     }
 }
