@@ -31,6 +31,15 @@ builder.Services.AddSingleton<ITradingChangeNotifier, TradingChangeNotifier>();
 builder.Services.AddHostedService<LogConverterService>();
 builder.Services.AddSignalR();
 builder.Services.AddHostedService<SignalRBridgeService>();
+
+builder.Services.AddHttpClient("HawkesPredictor", client =>
+{
+    var baseUrl = builder.Configuration["HawkesApi:BaseUrl"] ?? "http://elon-hawkes-predictor:5000";
+    client.BaseAddress = new Uri(baseUrl);
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+builder.Services.AddScoped<IHawkesPredictorService, HawkesPredictorService>();
+
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
