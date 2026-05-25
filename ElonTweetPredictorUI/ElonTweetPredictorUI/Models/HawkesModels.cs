@@ -19,32 +19,116 @@ public class HawkesPredictRequest
 
 public class HawkesPredictResponse
 {
-    [JsonPropertyName("window_start")]
-    public string WindowStart { get; set; } = "";
+    [JsonPropertyName("prediction_window")]
+    public HawkesPredictionWindow PredictionWindow { get; set; } = new();
 
-    [JsonPropertyName("window_end")]
-    public string WindowEnd { get; set; } = "";
+    [JsonPropertyName("hawkes_params")]
+    public HawkesParams HawkesParams { get; set; } = new();
 
-    [JsonPropertyName("momentum_hours")]
-    public int MomentumHours { get; set; }
+    [JsonPropertyName("per_hour_rates")]
+    public List<double> PerHourRates { get; set; } = [];
 
-    [JsonPropertyName("hawkes_horizon")]
-    public int HawkesHorizon { get; set; }
+    [JsonPropertyName("components")]
+    public HawkesComponents Components { get; set; } = new();
 
-    [JsonPropertyName("probability")]
-    public double Probability { get; set; }
+    [JsonPropertyName("weights")]
+    public HawkesWeights Weights { get; set; } = new();
 
-    [JsonPropertyName("hawkes_rate")]
-    public double? HawkesRate { get; set; }
+    [JsonPropertyName("validation")]
+    public HawkesValidation Validation { get; set; } = new();
 
-    [JsonPropertyName("momentum_score")]
-    public double? MomentumScore { get; set; }
+    [JsonPropertyName("final_prediction")]
+    public HawkesFinalPrediction FinalPrediction { get; set; } = new();
+}
 
-    [JsonPropertyName("recent_tweets")]
-    public int? RecentTweets { get; set; }
+public class HawkesPredictionWindow
+{
+    [JsonPropertyName("start")]
+    public string Start { get; set; } = "";
 
-    [JsonPropertyName("message")]
-    public string? Message { get; set; }
+    [JsonPropertyName("end")]
+    public string End { get; set; } = "";
+
+    [JsonPropertyName("hours")]
+    public double Hours { get; set; }
+
+    [JsonPropertyName("day_of_week")]
+    public string DayOfWeek { get; set; } = "";
+}
+
+public class HawkesParams
+{
+    [JsonPropertyName("mu")]
+    public double Mu { get; set; }
+
+    [JsonPropertyName("alpha")]
+    public double Alpha { get; set; }
+
+    [JsonPropertyName("beta")]
+    public double Beta { get; set; }
+
+    [JsonPropertyName("tau0")]
+    public double Tau0 { get; set; }
+
+    [JsonPropertyName("fitted")]
+    public bool Fitted { get; set; }
+}
+
+public class HawkesComponents
+{
+    [JsonPropertyName("day_hour_total")]
+    public double DayHourTotal { get; set; }
+
+    [JsonPropertyName("hawkes_short_term")]
+    public double HawkesShortTerm { get; set; }
+
+    [JsonPropertyName("hawkes_remaining_hours_pred")]
+    public double HawkesRemainingHoursPred { get; set; }
+
+    [JsonPropertyName("hawkes_hybrid_total")]
+    public double HawkesHybridTotal { get; set; }
+}
+
+public class HawkesWeights
+{
+    [JsonPropertyName("inverse_mse")]
+    public List<double> InverseMse { get; set; } = [];
+
+    [JsonPropertyName("akaike")]
+    public List<double> Akaike { get; set; } = [];
+
+    [JsonPropertyName("diversity")]
+    public List<double> Diversity { get; set; } = [];
+
+    [JsonPropertyName("entropy")]
+    public List<double> Entropy { get; set; } = [];
+
+    [JsonPropertyName("final_median")]
+    public List<double> FinalMedian { get; set; } = [];
+}
+
+public class HawkesValidation
+{
+    [JsonPropertyName("cv_windows")]
+    public int CvWindows { get; set; }
+
+    [JsonPropertyName("dow_hod_mse")]
+    public double DowHodMse { get; set; }
+
+    [JsonPropertyName("hawkes_hybrid_mse")]
+    public double HawkesHybridMse { get; set; }
+}
+
+public class HawkesFinalPrediction
+{
+    [JsonPropertyName("tweets")]
+    public double Tweets { get; set; }
+
+    [JsonPropertyName("ci_lower")]
+    public double CiLower { get; set; }
+
+    [JsonPropertyName("ci_upper")]
+    public double CiUpper { get; set; }
 }
 
 public class HawkesHealthResponse
