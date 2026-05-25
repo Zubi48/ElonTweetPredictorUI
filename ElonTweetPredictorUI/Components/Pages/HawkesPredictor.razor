@@ -89,16 +89,12 @@
     var excitColor     = excitRatio >= 1.0 ? "danger" : excitRatio >= 0.7 ? "warning" : excitRatio >= 0.3 ? "info" : "secondary";
     var excitPct       = (int)Math.Min(excitRatio * 100, 100);
     var baselinePct    = comp.HawkesHybridTotal > 0 ? comp.DayHourTotal / comp.HawkesHybridTotal * 100.0 : 0;
-    var momentumPct    = comp.HawkesHybridTotal > 0 ? comp.HawkesShortTerm / comp.HawkesHybridTotal * 100.0 : 0;
+    var momentumPct    = comp.HawkesHybridTotal > 0 ? (comp.HawkesShortTerm ?? 0.0) / comp.HawkesHybridTotal * 100.0 : 0;
     var momentum       = momentumPct > 40 ? "BURST DRIVEN" : momentumPct > 15 ? "MIXED" : "BASELINE DRIVEN";
     var momentumColor  = momentumPct > 40 ? "warning" : momentumPct > 15 ? "info" : "secondary";
     var modelQuality   = val.HawkesHybridMse < val.DowHodMse ? "Hawkes outperforms baseline" : "Baseline outperforms Hawkes";
     var modelQualColor = val.HawkesHybridMse < val.DowHodMse ? "success" : "warning";
-    var hourRates      = _result.PerHourRates
-                            .Select(e => e.ValueKind == System.Text.Json.JsonValueKind.Number
-                                         ? e.GetDouble()
-                                         : e.TryGetProperty("rate", out var r) ? r.GetDouble() : 0.0)
-                            .ToList();
+    var hourRates      = _result.PerHourRates.Select(r => r.Rate).ToList();
     var maxRate        = hourRates.Count > 0 ? hourRates.Max() : 1.0;
     var peakHour       = hourRates.Count > 0 ? hourRates.IndexOf(maxRate) + 1 : 0;
 
@@ -218,7 +214,7 @@
                     <div class="mb-3">
                         <div class="d-flex justify-content-between small mb-1">
                             <span class="text-muted">⚡ Hawkes Short-Term Burst</span>
-                            <span class="fw-semibold text-warning">@comp.HawkesShortTerm.ToString("F2") <span class="text-muted">(@(momentumPct.ToString("F0"))%)</span></span>
+                            <span class="fw-semibold text-warning">@((comp.HawkesShortTerm ?? 0.0).ToString("F2")) <span class="text-muted">(@(momentumPct.ToString("F0"))%)</span></span>
                         </div>
                         <div class="progress" style="height:8px;">
                             <div class="progress-bar bg-warning" style="width:@(Math.Min(momentumPct,100).ToString("F0"))%"></div>
@@ -267,28 +263,30 @@
                     @if (hourRates.Count > 0)
                     {
                         <div class="d-flex align-items-end gap-1" style="height:80px;">
-                            @for (int i = 0; i < hourRates.Count; i++)
+                            @for (int i = 0; i < _result.PerHourRates.Count; i++)
                             {
-                                var rate    = hourRates[i];
-                                var barPct  = maxRate > 0 ? rate / maxRate * 100.0 : 0;
-                                var barCol  = i + 1 == peakHour ? "warning" : rate > (maxRate * 0.6) ? "info" : "secondary";
-                                <div class="d-flex flex-column align-items-center flex-fill" title="h+@(i+1): @rate.ToString("F2")">
+                                var item    = _result.PerHourRates[i];
+                                var barPct  = maxRate > 0 ? item.Rate / maxRate * 100.0 : 0;
+                                var barCol  = i + 1 == peakHour ? "warning" : item.Rate > (maxRate * 0.6) ? "info" : "secondary";
+                                <div class="d-flex flex-column align-items-center flex-fill" title="@item.Hour:00 — @item.Rate.ToString("F2") tweets (@item.Observations obs)">
                                     <div class="w-100 rounded-top" style="height:@(barPct.ToString("F0"))%; background-color: var(--bs-@barCol); min-height:4px;"></div>
                                 </div>
                             }
                         </div>
                         <div class="d-flex gap-1 mt-1">
-                            @for (int i = 0; i < hourRates.Count; i++)
+                            @for (int i = 0; i < _result.PerHourRates.Count; i++)
                             {
-                                <div class="text-center flex-fill" style="font-size:0.6rem; color:var(--bs-secondary-color);">h+@(i+1)</div>
+                                <div class="text-center flex-fill" style="font-size:0.6rem; color:var(--bs-secondary-color);">@_result.PerHourRates[i].Hour:00</div>
                             }
                         </div>
                         <div class="d-flex flex-wrap gap-3 mt-2 small">
-                            @for (int i = 0; i < hourRates.Count; i++)
+                            @for (int i = 0; i < _result.PerHourRates.Count; i++)
                             {
-                                var rate   = hourRates[i];
+                                var item   = _result.PerHourRates[i];
                                 var isPeak = i + 1 == peakHour;
-                                <span class="@(isPeak ? "text-warning fw-bold" : "text-muted")">h+@(i+1): @rate.ToString("F2")</span>
+                                <span class="@(isPeak ? "text-warning fw-bold" : "text-muted")" title="@item.Observations observations · @item.Source">
+                                    @item.Hour:00 — @item.Rate.ToString("F2")
+                                </span>
                             }
                         </div>
                     }

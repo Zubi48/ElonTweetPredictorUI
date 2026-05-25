@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace ElonTweetPredictorUI.Models;
@@ -27,7 +26,7 @@ public class HawkesPredictResponse
     public HawkesParams HawkesParams { get; set; } = new();
 
     [JsonPropertyName("per_hour_rates")]
-    public List<JsonElement> PerHourRates { get; set; } = [];
+    public List<HawkesPerHourRate> PerHourRates { get; set; } = [];
 
     [JsonPropertyName("components")]
     public HawkesComponents Components { get; set; } = new();
@@ -81,7 +80,7 @@ public class HawkesComponents
     public double DayHourTotal { get; set; }
 
     [JsonPropertyName("hawkes_short_term")]
-    public double HawkesShortTerm { get; set; }
+    public double? HawkesShortTerm { get; set; }
 
     [JsonPropertyName("hawkes_remaining_hours_pred")]
     public double HawkesRemainingHoursPred { get; set; }
@@ -130,6 +129,24 @@ public class HawkesFinalPrediction
 
     [JsonPropertyName("ci_upper")]
     public double CiUpper { get; set; }
+}
+
+public class HawkesPerHourRate
+{
+    [JsonPropertyName("hour")]
+    public int Hour { get; set; }
+
+    [JsonPropertyName("day")]
+    public string Day { get; set; } = "";
+
+    [JsonPropertyName("rate")]
+    public double Rate { get; set; }
+
+    [JsonPropertyName("observations")]
+    public int Observations { get; set; }
+
+    [JsonPropertyName("source")]
+    public string Source { get; set; } = "";
 }
 
 public class HawkesHealthResponse
