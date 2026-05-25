@@ -35,6 +35,7 @@ public class TradeEntry
 
     public bool IsBuy => Type.Equals("BUY", StringComparison.OrdinalIgnoreCase);
     public bool IsSell => Type.Equals("SELL", StringComparison.OrdinalIgnoreCase);
+    public bool IsExternalClose => Type.Equals("EXTERNAL CLOSE", StringComparison.OrdinalIgnoreCase);
     public bool IsAdjustment => Type.Equals("ADJUSTMENT", StringComparison.OrdinalIgnoreCase);
     public bool IsWin => Outcome.Equals("WIN", StringComparison.OrdinalIgnoreCase);
 }

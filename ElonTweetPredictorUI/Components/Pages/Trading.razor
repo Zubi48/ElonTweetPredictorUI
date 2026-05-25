@@ -42,7 +42,7 @@ else if (_session is null)
     {
         <div class="alert alert-warning" role="alert">
             <h6 class="alert-heading mb-2">No trading data available</h6>
-            <p class="mb-0">The UI cannot find <code>trades.log</code> in the shared data volume (<code>/app/data</code>). Verify the trading bot is running.</p>
+            <p class="mb-0">The UI cannot find <code>simple-trades.log</code> in the shared data volume (<code>/app/data</code>). Verify the trading bot is running.</p>
         </div>
     }
 }
@@ -106,6 +106,7 @@ else
                     {
                         var cardClass = trade.IsBuy ? "trade-buy"
                             : trade.IsAdjustment ? "trade-adjustment"
+                            : trade.IsExternalClose ? (trade.PnLAmount >= 0 ? "trade-win" : "trade-sell")
                             : trade.IsWin ? "trade-win"
                             : trade.IsSync ? "trade-sync"
                             : "trade-sell";
@@ -146,13 +147,8 @@ else
                                         </div>
                                         <div class="col-6 col-md-3">
                                             <span class="text-muted">Edge:</span>
-                                            <span class="fw-semibold text-info ms-1">@trade.EdgePercent.ToString("F1")%</span>
-                                            <span class="text-muted ms-1 d-none d-lg-inline">(@trade.YourPercent.ToString("F1")% vs @trade.MarketPercent.ToString("F1")%)</span>
-                                        </div>
-                                        <div class="col-6 col-md-3">
-                                            <span class="text-muted">Kelly:</span>
-                                            <span class="fw-semibold ms-1">@trade.KellyAdjPercent.ToString("F1")%</span>
-                                            <span class="text-muted ms-1">(raw @trade.KellyRawPercent.ToString("F1")%)</span>
+                                            <span class="fw-semibold @(trade.EdgePercent >= 0 ? "text-success" : "text-danger") ms-1">@(trade.EdgePercent >= 0 ? "+" : "")@trade.EdgePercent.ToString("F1")%</span>
+                                            <span class="text-muted ms-1 d-none d-lg-inline">(model @trade.YourPercent.ToString("F1")% vs market @trade.MarketPercent.ToString("F1")%)</span>
                                         </div>
                                     }
                                     else if (trade.IsSync && !trade.HasPnL)
@@ -189,7 +185,7 @@ else
                                     }
                                     else
                                     {
-                                        @* Regular SELL / ADJUSTMENT with P&L data *@
+                                        @* Regular SELL / EXTERNAL CLOSE / ADJUSTMENT with P&L data *@
                                         <div class="col-6 col-md-3">
                                             <span class="text-muted">Shares:</span>
                                             <span class="fw-semibold ms-1">@trade.Shares</span>
@@ -198,16 +194,13 @@ else
                                             <span class="text-muted">Entry:</span>
                                             <span class="fw-semibold ms-1">$@trade.EntryPrice.ToString("F4")</span>
                                             <span class="text-muted mx-1">→</span>
-                                            <span class="text-muted">Current:</span>
+                                            <span class="text-muted">Exit:</span>
                                             <span class="fw-semibold ms-1">$@trade.CurrentPrice.ToString("F4")</span>
                                         </div>
                                         <div class="col-6 col-md-3">
                                             <span class="text-muted">P&amp;L:</span>
                                             <span class="fw-semibold ms-1 @(trade.PnLAmount >= 0 ? "text-success" : "text-danger")">
                                                 @(trade.PnLAmount >= 0 ? "+" : "")$@trade.PnLAmount.ToString("F2")
-                                            </span>
-                                            <span class="@(trade.PnLPercent >= 0 ? "text-success" : "text-danger") ms-1">
-                                                (@(trade.PnLPercent >= 0 ? "+" : "")@trade.PnLPercent.ToString("F1")%)
                                             </span>
                                         </div>
                                         @if (!string.IsNullOrEmpty(trade.SellEdgeRaw))

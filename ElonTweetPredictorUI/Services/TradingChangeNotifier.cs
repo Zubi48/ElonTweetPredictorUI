@@ -25,7 +25,7 @@ public sealed class TradingChangeNotifier : ITradingChangeNotifier, IDisposable
 
         _watcher = new FileSystemWatcher(dataPath)
         {
-            Filter = "trades.log",
+            Filter = "simple-trades.log",
             NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.CreationTime,
             EnableRaisingEvents = true
         };

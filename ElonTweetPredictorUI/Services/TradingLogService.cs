@@ -13,15 +13,15 @@ public sealed partial class TradingLogService : ITradingLogService
 {
     private readonly string _logFilePath;
 
-    [GeneratedRegex(@"NEW SESSION STARTED\s*[—–-]\s*(.+)")]
+    [GeneratedRegex(@"SESSION STARTED\s*[—–-]\s*(.+)")]
     private static partial Regex SessionStartRegex();
 
     // Initial header: Started: 2026-04-04 10:42:55 PM ET
     [GeneratedRegex(@"^\s+Started:\s+(.+)")]
     private static partial Regex InitialStartRegex();
 
-    // BUY [LIVE] or SELL [LIVE] (WIN) or SELL [LIVE] (LOSS)
-    [GeneratedRegex(@"┌── (\w+) \[(\w+)\](?:\s+\((\w+)\))?")]
+    // BUY [LIVE], SELL [LIVE], EXTERNAL CLOSE [ManualSell], etc.
+    [GeneratedRegex(@"┌── ([^\[]+?)\s*\[([^\]]+)\](?:\s+\((\w+)\))?")]
     private static partial Regex TradeHeaderRegex();
 
     [GeneratedRegex(@"│\s+Time:\s+(.+)")]
@@ -44,8 +44,8 @@ public sealed partial class TradingLogService : ITradingLogService
     [GeneratedRegex(@"│\s+Cost:\s+\$?([\d.]+)")]
     private static partial Regex TradeCostRegex();
 
-    // BUY: Edge: 18.5 % (yours=22.9 % vs market=4.5 %)
-    [GeneratedRegex(@"│\s+Edge:\s+([\d.]+)\s*%\s*\(yours=([\d.]+)\s*%\s*vs\s+market=([\d.]+)\s*%\)")]
+    // BUY: Edge: +12.7%  (model=95.7 % vs market=83.0 %)
+    [GeneratedRegex(@"│\s+Edge:\s+([+-]?[\d.]+)\s*%\s*\(model=([\d.]+)\s*%\s*vs\s+market=([\d.]+)\s*%\)")]
     private static partial Regex TradeBuyEdgeRegex();
 
     // BUY: Kelly
@@ -60,8 +60,8 @@ public sealed partial class TradingLogService : ITradingLogService
     [GeneratedRegex(@"│\s+Current:\s+\$?([\d.]+)")]
     private static partial Regex TradeCurrentPriceRegex();
 
-    // SELL: P&L: +$0.02 (+6.3 %) or $-0.50 (-10.2 %)
-    [GeneratedRegex(@"│\s+P&L:\s+([+-]?\$?[+-]?[\d.]+)\s+\(([+-]?[\d.]+)\s*%\)")]
+    // P&L: $-49.63 or $+4.03
+    [GeneratedRegex(@"│\s+P&L:\s+\$([+-]?[\d.]+)")]
     private static partial Regex TradePnLRegex();
 
     // SELL: Edge: -1.5 % | Reason: Edge flip
@@ -98,7 +98,7 @@ public sealed partial class TradingLogService : ITradingLogService
     public TradingLogService(IConfiguration configuration)
     {
         var dataPath = configuration["DataPath"] ?? ".";
-        _logFilePath = Path.Combine(dataPath, "trades.log");
+        _logFilePath = Path.Combine(dataPath, "simple-trades.log");
     }
 
     public async Task<TradingSession?> GetSessionAsync()
@@ -181,6 +181,18 @@ public sealed partial class TradingLogService : ITradingLogService
             ApplySummaryField(session.LatestSummary, line);
         }
 
+        // Compute summary from trades (new log has no summary lines)
+        var closedTrades = session.Trades.Where(t => t.IsSell || t.IsExternalClose).ToList();
+        session.LatestSummary.Buys = session.Trades.Count(t => t.IsBuy);
+        session.LatestSummary.Sells = closedTrades.Count;
+        session.LatestSummary.Wins = closedTrades.Count(t => t.PnLAmount > 0);
+        session.LatestSummary.Losses = closedTrades.Count(t => t.PnLAmount < 0);
+        var totalClosed = session.LatestSummary.Wins + session.LatestSummary.Losses;
+        session.LatestSummary.WinratePercent = totalClosed > 0
+            ? (double)session.LatestSummary.Wins / totalClosed * 100
+            : 0;
+        session.LatestSummary.TotalPnL = closedTrades.Sum(t => t.PnLAmount);
+
         return session.Trades.Count > 0 || !string.IsNullOrEmpty(session.StartedAt)
             ? session
             : null;
@@ -234,11 +246,8 @@ public sealed partial class TradingLogService : ITradingLogService
         m = TradePnLRegex().Match(line);
         if (m.Success)
         {
-            var raw = m.Groups[1].Value.Replace("$", "").Trim();
-            if (decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var pnl))
+            if (decimal.TryParse(m.Groups[1].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var pnl))
                 trade.PnLAmount = pnl;
-            if (double.TryParse(m.Groups[2].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var pnlPct))
-                trade.PnLPercent = pnlPct;
             return;
         }
 
@@ -250,9 +259,17 @@ public sealed partial class TradingLogService : ITradingLogService
             return;
         }
 
-        // SYNC: Exit info
+        // Exit: price (SELL/EXTERNAL CLOSE) or UNKNOWN (external)
         m = TradeExitRegex().Match(line);
-        if (m.Success) { trade.ExitInfo = m.Groups[1].Value.Trim(); return; }
+        if (m.Success)
+        {
+            var exitStr = m.Groups[1].Value.Trim();
+            trade.ExitInfo = exitStr;
+            var numericStr = exitStr.TrimStart('$');
+            if (decimal.TryParse(numericStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var exitPrice))
+                trade.CurrentPrice = exitPrice;
+            return;
+        }
 
         // Standalone Reason: (SYNC sells — must be after TradeSellEdgeRegex)
         m = TradeReasonRegex().Match(line);
