@@ -1,0 +1,261 @@
+@page "/hawkes-predictor"
+@rendermode InteractiveServer
+@inject IHawkesPredictorService HawkesService
+
+<PageTitle>Hawkes Predictor</PageTitle>
+
+@* ── Status bar ── *@
+<div class="status-bar mb-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <span class="badge bg-secondary">HAWKES PREDICTOR</span>
+            @if (_health is not null)
+            {
+                <span class="badge @(_health.HawkesFitted ? "bg-success" : "bg-warning") ms-2">
+                    @(_health.HawkesFitted ? "Model Fitted" : "Not Fitted")
+                </span>
+                <span class="text-muted small ms-2">@_health.DataRows rows</span>
+            }
+            else if (_healthError)
+            {
+                <span class="badge bg-danger ms-2">API Unreachable</span>
+            }
+        </div>
+        <div class="text-muted small">Bayesian + Hawkes Process Model</div>
+    </div>
+</div>
+
+@* ── Input form ── *@
+<div class="card bg-dark border-secondary mb-4">
+    <div class="card-body">
+        <h6 class="card-title mb-3">🔭 Prediction Parameters</h6>
+        <div class="row g-3">
+            <div class="col-12 col-md-6 col-lg-3">
+                <label class="form-label small text-muted">Window Start <span class="text-warning">(EST)</span></label>
+                <input type="datetime-local" class="form-control form-control-sm bg-dark text-light border-secondary"
+                       @bind="_windowStart" />
+            </div>
+            <div class="col-12 col-md-6 col-lg-3">
+                <label class="form-label small text-muted">Window End <span class="text-warning">(EST)</span></label>
+                <input type="datetime-local" class="form-control form-control-sm bg-dark text-light border-secondary"
+                       @bind="_windowEnd" />
+            </div>
+            <div class="col-6 col-md-3 col-lg-2">
+                <label class="form-label small text-muted">Momentum Hours</label>
+                <input type="number" min="1" max="24" class="form-control form-control-sm bg-dark text-light border-secondary"
+                       @bind="_momentumHours" />
+            </div>
+            <div class="col-6 col-md-3 col-lg-2">
+                <label class="form-label small text-muted">Hawkes Horizon</label>
+                <input type="number" min="1" max="24" class="form-control form-control-sm bg-dark text-light border-secondary"
+                       @bind="_hawkesHorizon" />
+            </div>
+            <div class="col-12 col-lg-2 d-flex align-items-end">
+                <button class="btn btn-primary btn-sm w-100" @onclick="RunPrediction" disabled="@_loading">
+                    @if (_loading)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    Predict
+                </button>
+            </div>
+        </div>
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <div class="alert alert-danger mt-3 mb-0 py-2 small">@_errorMessage</div>
+        }
+    </div>
+</div>
+
+@* ── Results ── *@
+@if (_result is not null)
+{
+    var fp   = _result.FinalPrediction;
+    var pw   = _result.PredictionWindow;
+    var comp = _result.Components;
+    var val  = _result.Validation;
+
+    @* Final prediction hero *@
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-md-4">
+            <div class="metric-card text-center">
+                <div class="metric-label">Predicted Tweets</div>
+                <div class="metric-value text-info">@fp.Tweets.ToString("F1")</div>
+                <div class="metric-sublabel text-muted">@pw.DayOfWeek · @pw.Hours h window</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4">
+            <div class="metric-card text-center">
+                <div class="metric-label">CI Lower</div>
+                <div class="metric-value text-success">@fp.CiLower.ToString("F1")</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4">
+            <div class="metric-card text-center">
+                <div class="metric-label">CI Upper</div>
+                <div class="metric-value text-warning">@fp.CiUpper.ToString("F1")</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        @* Components *@
+        <div class="col-12 col-lg-6">
+            <div class="card bg-dark border-secondary h-100">
+                <div class="card-body">
+                    <h6 class="card-title mb-3">⚙️ Components</h6>
+                    <div class="row g-2 small">
+                        <div class="col-6">
+                            <span class="text-muted">Day/Hour Baseline:</span>
+                            <span class="fw-semibold ms-1">@comp.DayHourTotal.ToString("F4")</span>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted">Hawkes Short-Term:</span>
+                            <span class="fw-semibold ms-1">@comp.HawkesShortTerm.ToString("F4")</span>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted">Remaining Hours Pred:</span>
+                            <span class="fw-semibold ms-1">@comp.HawkesRemainingHoursPred.ToString("F4")</span>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted">Hybrid Total:</span>
+                            <span class="fw-semibold text-info ms-1">@comp.HawkesHybridTotal.ToString("F4")</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* Hawkes params *@
+        <div class="col-12 col-lg-6">
+            <div class="card bg-dark border-secondary h-100">
+                <div class="card-body">
+                    <h6 class="card-title mb-3">
+                        🔬 Hawkes Parameters
+                        <span class="badge @(_result.HawkesParams.Fitted ? "bg-success" : "bg-warning") ms-2 fw-normal">
+                            @(_result.HawkesParams.Fitted ? "fitted" : "not fitted")
+                        </span>
+                    </h6>
+                    <div class="row g-2 small">
+                        <div class="col-6 col-md-3">
+                            <span class="text-muted">μ:</span>
+                            <span class="fw-semibold ms-1">@_result.HawkesParams.Mu.ToString("F6")</span>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <span class="text-muted">α:</span>
+                            <span class="fw-semibold ms-1">@_result.HawkesParams.Alpha.ToString("F6")</span>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <span class="text-muted">β:</span>
+                            <span class="fw-semibold ms-1">@_result.HawkesParams.Beta.ToString("F6")</span>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <span class="text-muted">τ₀:</span>
+                            <span class="fw-semibold ms-1">@_result.HawkesParams.Tau0.ToString("F6")</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* Validation *@
+        <div class="col-12 col-lg-6">
+            <div class="card bg-dark border-secondary h-100">
+                <div class="card-body">
+                    <h6 class="card-title mb-3">✅ Validation</h6>
+                    <div class="row g-2 small">
+                        <div class="col-6">
+                            <span class="text-muted">CV Windows:</span>
+                            <span class="fw-semibold ms-1">@val.CvWindows</span>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted">DoW/HoD MSE:</span>
+                            <span class="fw-semibold ms-1">@val.DowHodMse.ToString("F4")</span>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted">Hawkes Hybrid MSE:</span>
+                            <span class="fw-semibold ms-1">@val.HawkesHybridMse.ToString("F4")</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* Per-hour rates *@
+        @if (_result.PerHourRates.Count > 0)
+        {
+            <div class="col-12 col-lg-6">
+                <div class="card bg-dark border-secondary h-100">
+                    <div class="card-body">
+                        <h6 class="card-title mb-3">📊 Per-Hour Rates</h6>
+                        <div class="d-flex flex-wrap gap-2">
+                            @for (int i = 0; i < _result.PerHourRates.Count; i++)
+                            {
+                                var hour = i;
+                                <div class="text-center" style="min-width: 48px;">
+                                    <div class="small text-muted">h+@(hour + 1)</div>
+                                    <div class="fw-semibold small text-info">@_result.PerHourRates[hour].ToString("F2")</div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private HawkesHealthResponse? _health;
+    private HawkesPredictResponse? _result;
+    private bool _loading;
+    private bool _healthError;
+    private string _errorMessage = "";
+
+    private DateTime _windowStart = DateTime.Today.AddHours(8);
+    private DateTime _windowEnd   = DateTime.Today.AddHours(11);
+    private int _momentumHours = 3;
+    private int _hawkesHorizon = 2;
+
+    private const string DateFormat = "MM/dd/yyyy HH:mm";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _health = await HawkesService.GetHealthAsync();
+        _healthError = _health is null;
+    }
+
+    private async Task RunPrediction()
+    {
+        _errorMessage = "";
+
+        if (_windowEnd <= _windowStart)
+        {
+            _errorMessage = "Window end must be after window start.";
+            return;
+        }
+
+        _loading = true;
+        _result = null;
+
+        try
+        {
+            var request = new HawkesPredictRequest
+            {
+                WindowStart   = _windowStart.ToString(DateFormat),
+                WindowEnd     = _windowEnd.ToString(DateFormat),
+                MomentumHours = _momentumHours,
+                HawkesHorizon = _hawkesHorizon
+            };
+
+            _result = await HawkesService.GetPredictionAsync(request);
+
+            if (_result is null)
+                _errorMessage = "The Hawkes predictor API is unreachable or returned an error.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}
