@@ -34,7 +34,7 @@ builder.Services.AddHostedService<SignalRBridgeService>();
 
 builder.Services.AddHttpClient("HawkesPredictor", client =>
 {
-    var baseUrl = builder.Configuration["HawkesApi:BaseUrl"] ?? "http://elon-hawkes-predictor:5000";
+    var baseUrl = builder.Configuration["HawkesApi:BaseUrl"] ?? "http://elon-hawkes-predictor:8000";
     client.BaseAddress = new Uri(baseUrl);
     client.Timeout = TimeSpan.FromSeconds(30);
 });
