@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace ElonTweetPredictorUI.Models;
@@ -26,7 +27,7 @@ public class HawkesPredictResponse
     public HawkesParams HawkesParams { get; set; } = new();
 
     [JsonPropertyName("per_hour_rates")]
-    public List<double> PerHourRates { get; set; } = [];
+    public List<JsonElement> PerHourRates { get; set; } = [];
 
     [JsonPropertyName("components")]
     public HawkesComponents Components { get; set; } = new();

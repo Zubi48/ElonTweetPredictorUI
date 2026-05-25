@@ -44,7 +44,11 @@ public sealed class HawkesPredictorService : IHawkesPredictorService
             var client = _httpClientFactory.CreateClient("HawkesPredictor");
             var response = await client.PostAsJsonAsync("/predict", request, JsonOptions, cancellationToken);
             response.EnsureSuccessStatusCode();
-            return await response.Content.ReadFromJsonAsync<HawkesPredictResponse>(JsonOptions, cancellationToken);
+
+            var rawJson = await response.Content.ReadAsStringAsync(cancellationToken);
+            _logger.LogInformation("Hawkes /predict raw response: {Json}", rawJson);
+
+            return JsonSerializer.Deserialize<HawkesPredictResponse>(rawJson, JsonOptions);
         }
         catch (Exception ex)
         {
