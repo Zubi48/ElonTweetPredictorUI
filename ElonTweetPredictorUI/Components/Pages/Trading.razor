@@ -456,37 +456,38 @@ else
     private List<TradePair> GroupTradesIntoPairs(List<TradeEntry> trades)
     {
         var pairs = new List<TradePair>();
-        var reversedTrades = Enumerable.Reverse(trades).ToList();
-        var i = 0;
+        var openBuys = new Queue<TradeEntry>();
 
-        while (i < reversedTrades.Count)
+        // Walk in chronological order so the first buy matches the first sell (FIFO)
+        foreach (var trade in trades)
         {
-            var trade = reversedTrades[i];
-
             if (trade.IsBuy)
             {
-                var pair = new TradePair { Buy = trade };
-
-                // Look for the next sell trade to pair with this buy
-                if (i + 1 < reversedTrades.Count && !reversedTrades[i + 1].IsBuy)
-                {
-                    pair.Sell = reversedTrades[i + 1];
-                    i += 2; // Skip the next trade since we've used it
-                }
-                else
-                {
-                    i++;
-                }
-
-                pairs.Add(pair);
+                openBuys.Enqueue(trade);
             }
             else
             {
-                // Unpaired sell (no buy before it), add as standalone
-                pairs.Add(new TradePair { Buy = trade, Sell = null });
-                i++;
+                if (openBuys.Count > 0)
+                {
+                    // Pair this sell with its corresponding buy
+                    pairs.Add(new TradePair { Buy = openBuys.Dequeue(), Sell = trade });
+                }
+                else
+                {
+                    // Orphan sell with no matching buy
+                    pairs.Add(new TradePair { Buy = trade, Sell = null });
+                }
             }
         }
+
+        // Remaining open buys that have no sell yet (still open positions)
+        while (openBuys.Count > 0)
+        {
+            pairs.Add(new TradePair { Buy = openBuys.Dequeue(), Sell = null });
+        }
+
+        // Reverse to show newest pairs first
+        pairs.Reverse();
 
         return pairs;
     }
