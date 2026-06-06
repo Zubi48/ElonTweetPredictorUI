@@ -101,139 +101,299 @@ else
         <div class="card bg-dark border-secondary mb-4">
             <div class="card-body">
                 <h6 class="card-title mb-3">📋 Trades (@_session.Trades.Count)</h6>
-                <div class="trade-list">
-                    @foreach (var trade in Enumerable.Reverse(_session.Trades))
+                <div class="trade-pairs">
+                    @foreach (var pair in GroupTradesIntoPairs(_session.Trades))
                     {
-                        var cardClass = trade.IsBuy ? "trade-buy"
-                            : trade.IsAdjustment ? "trade-adjustment"
-                            : trade.IsExternalClose ? (trade.PnLAmount >= 0 ? "trade-win" : "trade-sell")
-                            : trade.IsWin ? "trade-win"
-                            : trade.IsSync ? "trade-sync"
-                            : "trade-sell";
-                        var typeBadge = trade.IsBuy ? "bg-success"
-                            : trade.IsAdjustment ? "bg-warning"
-                            : "bg-danger";
-
-                        <div class="trade-card @cardClass">
-                            <div class="trade-header">
-                                <div class="d-flex align-items-center gap-2">
-                                    <span class="badge @typeBadge">@trade.Type</span>
-                                    <span class="badge bg-secondary">@trade.Mode</span>
-                                    @if (!string.IsNullOrEmpty(trade.Outcome))
-                                    {
-                                        <span class="badge @(trade.IsWin ? "bg-success" : "bg-danger")">@trade.Outcome</span>
-                                    }
-                                    <span class="fw-semibold small">@trade.Event</span>
-                                </div>
-                                <div class="small text-muted mt-1">@trade.Time</div>
-                            </div>
-                            <div class="trade-body">
-                                <div class="row g-2 small">
-                                    <div class="col-6 col-md-3">
-                                        <span class="text-muted">Interval:</span>
-                                        <span class="fw-semibold ms-1">@trade.Interval</span>
+                        <div class="trade-pair-row">
+                            <!-- Left side: Buy or Solo Trade -->
+                            <div class="trade-pair-col trade-pair-left">
+                                @{
+                                    var trade = pair.Buy;
+                                    var cardClass = trade.IsBuy ? "trade-buy"
+                                        : trade.IsAdjustment ? "trade-adjustment"
+                                        : trade.IsExternalClose ? (trade.PnLAmount >= 0 ? "trade-win" : "trade-sell")
+                                        : trade.IsWin ? "trade-win"
+                                        : trade.IsSync ? "trade-sync"
+                                        : "trade-sell";
+                                    var typeBadge = trade.IsBuy ? "bg-success"
+                                        : trade.IsAdjustment ? "bg-warning"
+                                        : "bg-danger";
+                                }
+                                <div class="trade-card @cardClass">
+                                    <div class="trade-header">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="badge @typeBadge">@trade.Type</span>
+                                            <span class="badge bg-secondary">@trade.Mode</span>
+                                            @if (!string.IsNullOrEmpty(trade.Outcome))
+                                            {
+                                                <span class="badge @(trade.IsWin ? "bg-success" : "bg-danger")">@trade.Outcome</span>
+                                            }
+                                            <span class="fw-semibold small">@trade.Event</span>
+                                        </div>
+                                        <div class="small text-muted mt-1">@trade.Time</div>
                                     </div>
+                                    <div class="trade-body">
+                                        <div class="row g-2 small">
+                                            <div class="col-6 col-md-3">
+                                                <span class="text-muted">Interval:</span>
+                                                <span class="fw-semibold ms-1">@trade.Interval</span>
+                                            </div>
 
-                                    @if (trade.IsBuy)
-                                    {
-                                        <div class="col-6 col-md-3">
-                                            <span class="text-muted">Shares:</span>
-                                            <span class="fw-semibold ms-1">@trade.Shares</span>
-                                            <span class="text-muted ms-1">@@ $@trade.Price.ToString("F4")</span>
-                                        </div>
-                                        <div class="col-6 col-md-3">
-                                            <span class="text-muted">Cost:</span>
-                                            <span class="fw-semibold ms-1">$@trade.Cost.ToString("F2")</span>
-                                        </div>
-                                        <div class="col-6 col-md-3">
-                                            <span class="text-muted">Edge:</span>
-                                            <span class="fw-semibold @(trade.EdgePercent >= 0 ? "text-success" : "text-danger") ms-1">@(trade.EdgePercent >= 0 ? "+" : "")@trade.EdgePercent.ToString("F1")%</span>
-                                            <span class="text-muted ms-1 d-none d-lg-inline">(model @trade.YourPercent.ToString("F1")% vs market @trade.MarketPercent.ToString("F1")%)</span>
-                                        </div>
-                                    }
-                                    else if (trade.IsSync && !trade.HasPnL)
-                                    {
-                                        @* SYNC sell with unknown exit — no P&L data *@
-                                        <div class="col-6 col-md-3">
-                                            <span class="text-muted">Shares:</span>
-                                            <span class="fw-semibold ms-1">@trade.Shares</span>
-                                        </div>
-                                        <div class="col-6 col-md-3">
-                                            <span class="text-muted">Entry:</span>
-                                            <span class="fw-semibold ms-1">$@trade.EntryPrice.ToString("F4")</span>
-                                        </div>
-                                        @if (!string.IsNullOrEmpty(trade.ExitInfo))
-                                        {
-                                            <div class="col-6 col-md-3">
-                                                <span class="text-muted">Exit:</span>
-                                                <span class="fw-semibold text-warning ms-1">@trade.ExitInfo</span>
-                                            </div>
-                                        }
-                                        @if (!string.IsNullOrEmpty(trade.SellReason))
-                                        {
-                                            <div class="col-12">
-                                                <span class="text-muted">Reason:</span>
-                                                <span class="text-warning ms-1">@trade.SellReason</span>
-                                            </div>
-                                        }
-                                        @if (!string.IsNullOrEmpty(trade.Note))
-                                        {
-                                            <div class="col-12">
-                                                <span class="text-muted fst-italic">@trade.Note</span>
-                                            </div>
-                                        }
-                                    }
-                                    else
-                                    {
-                                        @* Regular SELL / EXTERNAL CLOSE / ADJUSTMENT with P&L data *@
-                                        <div class="col-6 col-md-3">
-                                            <span class="text-muted">Shares:</span>
-                                            <span class="fw-semibold ms-1">@trade.Shares</span>
-                                        </div>
-                                        <div class="col-6 col-md-3">
-                                            <span class="text-muted">Entry:</span>
-                                            <span class="fw-semibold ms-1">$@trade.EntryPrice.ToString("F4")</span>
-                                            <span class="text-muted mx-1">→</span>
-                                            <span class="text-muted">Exit:</span>
-                                            <span class="fw-semibold ms-1">$@trade.CurrentPrice.ToString("F4")</span>
-                                        </div>
-                                        <div class="col-6 col-md-3">
-                                            <span class="text-muted">P&amp;L:</span>
-                                            <span class="fw-semibold ms-1 @(trade.PnLAmount >= 0 ? "text-success" : "text-danger")">
-                                                @(trade.PnLAmount >= 0 ? "+" : "")$@trade.PnLAmount.ToString("F2")
-                                            </span>
-                                        </div>
-                                        @if (!string.IsNullOrEmpty(trade.SellEdgeRaw))
-                                        {
-                                            <div class="col-6 col-md-3">
-                                                <span class="text-muted">Edge:</span>
-                                                <span class="fw-semibold ms-1">@trade.SellEdgeRaw</span>
-                                            </div>
-                                        }
-                                        @if (!string.IsNullOrEmpty(trade.SellReason))
-                                        {
-                                            <div class="col-6 col-md-3">
-                                                <span class="text-muted">Reason:</span>
-                                                <span class="fw-semibold text-warning ms-1">@trade.SellReason</span>
-                                            </div>
-                                        }
-                                    }
+                                            @if (trade.IsBuy)
+                                            {
+                                                <div class="col-6 col-md-3">
+                                                    <span class="text-muted">Shares:</span>
+                                                    <span class="fw-semibold ms-1">@trade.Shares</span>
+                                                    <span class="text-muted ms-1">@@ $@trade.Price.ToString("F4")</span>
+                                                </div>
+                                                <div class="col-6 col-md-3">
+                                                    <span class="text-muted">Cost:</span>
+                                                    <span class="fw-semibold ms-1">$@trade.Cost.ToString("F2")</span>
+                                                </div>
+                                                <div class="col-6 col-md-3">
+                                                    <span class="text-muted">Edge:</span>
+                                                    <span class="fw-semibold @(trade.EdgePercent >= 0 ? "text-success" : "text-danger") ms-1">@(trade.EdgePercent >= 0 ? "+" : "")@trade.EdgePercent.ToString("F1")%</span>
+                                                    <span class="text-muted ms-1 d-none d-lg-inline">(model @trade.YourPercent.ToString("F1")% vs market @trade.MarketPercent.ToString("F1")%)</span>
+                                                </div>
+                                            }
+                                            else if (trade.IsSync && !trade.HasPnL)
+                                            {
+                                                @* SYNC sell with unknown exit — no P&L data *@
+                                                <div class="col-6 col-md-3">
+                                                    <span class="text-muted">Shares:</span>
+                                                    <span class="fw-semibold ms-1">@trade.Shares</span>
+                                                </div>
+                                                <div class="col-6 col-md-3">
+                                                    <span class="text-muted">Entry:</span>
+                                                    <span class="fw-semibold ms-1">$@trade.EntryPrice.ToString("F4")</span>
+                                                </div>
+                                                @if (!string.IsNullOrEmpty(trade.ExitInfo))
+                                                {
+                                                    <div class="col-6 col-md-3">
+                                                        <span class="text-muted">Exit:</span>
+                                                        <span class="fw-semibold text-warning ms-1">@trade.ExitInfo</span>
+                                                    </div>
+                                                }
+                                                @if (!string.IsNullOrEmpty(trade.SellReason))
+                                                {
+                                                    <div class="col-12">
+                                                        <span class="text-muted">Reason:</span>
+                                                        <span class="text-warning ms-1">@trade.SellReason</span>
+                                                    </div>
+                                                }
+                                                @if (!string.IsNullOrEmpty(trade.Note))
+                                                {
+                                                    <div class="col-12">
+                                                        <span class="text-muted fst-italic">@trade.Note</span>
+                                                    </div>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                @* Regular SELL / EXTERNAL CLOSE / ADJUSTMENT with P&L data *@
+                                                <div class="col-6 col-md-3">
+                                                    <span class="text-muted">Shares:</span>
+                                                    <span class="fw-semibold ms-1">@trade.Shares</span>
+                                                </div>
+                                                <div class="col-6 col-md-3">
+                                                    <span class="text-muted">Entry:</span>
+                                                    <span class="fw-semibold ms-1">$@trade.EntryPrice.ToString("F4")</span>
+                                                    <span class="text-muted mx-1">→</span>
+                                                    <span class="text-muted">Exit:</span>
+                                                    <span class="fw-semibold ms-1">$@trade.CurrentPrice.ToString("F4")</span>
+                                                </div>
+                                                <div class="col-6 col-md-3">
+                                                    <span class="text-muted">P&amp;L:</span>
+                                                    <span class="fw-semibold ms-1 @(trade.PnLAmount >= 0 ? "text-success" : "text-danger")">
+                                                        @(trade.PnLAmount >= 0 ? "+" : "")$@trade.PnLAmount.ToString("F2")
+                                                    </span>
+                                                </div>
+                                                @if (trade.GrowthPercent != 0)
+                                                {
+                                                    <div class="col-6 col-md-3">
+                                                        <span class="text-muted">Growth:</span>
+                                                        <span class="fw-semibold ms-1 @(trade.GrowthPercent >= 0 ? "text-success" : "text-danger")">
+                                                            @(trade.GrowthPercent >= 0 ? "+" : "")@trade.GrowthPercent.ToString("F2")%
+                                                        </span>
+                                                    </div>
+                                                }
+                                                @if (!string.IsNullOrEmpty(trade.SellEdgeRaw))
+                                                {
+                                                    <div class="col-6 col-md-3">
+                                                        <span class="text-muted">Edge:</span>
+                                                        <span class="fw-semibold ms-1">@trade.SellEdgeRaw</span>
+                                                    </div>
+                                                }
+                                                @if (!string.IsNullOrEmpty(trade.SellReason))
+                                                {
+                                                    <div class="col-6 col-md-3">
+                                                        <span class="text-muted">Reason:</span>
+                                                        <span class="fw-semibold text-warning ms-1">@trade.SellReason</span>
+                                                    </div>
+                                                }
+                                            }
 
-                                    @if (!string.IsNullOrEmpty(trade.OrderId))
-                                    {
-                                        <div class="col-12">
-                                            <span class="text-muted">Order:</span>
-                                            <code class="small ms-1 text-break">@trade.OrderId</code>
+                                            @if (!string.IsNullOrEmpty(trade.OrderId))
+                                            {
+                                                <div class="col-12">
+                                                    <span class="text-muted">Order:</span>
+                                                    <code class="small ms-1 text-break">@trade.OrderId</code>
+                                                </div>
+                                            }
                                         </div>
-                                    }
+                                    </div>
                                 </div>
                             </div>
+
+                            <!-- Right side: Corresponding Sell -->
+                            @if (pair.Sell is not null)
+                            {
+                                <div class="trade-pair-col trade-pair-right">
+                                    @{
+                                        var sellTrade = pair.Sell;
+                                        var sellCardClass = sellTrade.IsBuy ? "trade-buy"
+                                            : sellTrade.IsAdjustment ? "trade-adjustment"
+                                            : sellTrade.IsExternalClose ? (sellTrade.PnLAmount >= 0 ? "trade-win" : "trade-sell")
+                                            : sellTrade.IsWin ? "trade-win"
+                                            : sellTrade.IsSync ? "trade-sync"
+                                            : "trade-sell";
+                                        var sellTypeBadge = sellTrade.IsBuy ? "bg-success"
+                                            : sellTrade.IsAdjustment ? "bg-warning"
+                                            : "bg-danger";
+                                    }
+                                    <div class="trade-card @sellCardClass">
+                                        <div class="trade-header">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="badge @sellTypeBadge">@sellTrade.Type</span>
+                                                <span class="badge bg-secondary">@sellTrade.Mode</span>
+                                                @if (!string.IsNullOrEmpty(sellTrade.Outcome))
+                                                {
+                                                    <span class="badge @(sellTrade.IsWin ? "bg-success" : "bg-danger")">@sellTrade.Outcome</span>
+                                                }
+                                                <span class="fw-semibold small">@sellTrade.Event</span>
+                                            </div>
+                                            <div class="small text-muted mt-1">@sellTrade.Time</div>
+                                        </div>
+                                        <div class="trade-body">
+                                            <div class="row g-2 small">
+                                                <div class="col-6 col-md-3">
+                                                    <span class="text-muted">Interval:</span>
+                                                    <span class="fw-semibold ms-1">@sellTrade.Interval</span>
+                                                </div>
+
+                                                @if (sellTrade.IsBuy)
+                                                {
+                                                    <div class="col-6 col-md-3">
+                                                        <span class="text-muted">Shares:</span>
+                                                        <span class="fw-semibold ms-1">@sellTrade.Shares</span>
+                                                        <span class="text-muted ms-1">@@ $@sellTrade.Price.ToString("F4")</span>
+                                                    </div>
+                                                    <div class="col-6 col-md-3">
+                                                        <span class="text-muted">Cost:</span>
+                                                        <span class="fw-semibold ms-1">$@sellTrade.Cost.ToString("F2")</span>
+                                                    </div>
+                                                    <div class="col-6 col-md-3">
+                                                        <span class="text-muted">Edge:</span>
+                                                        <span class="fw-semibold @(sellTrade.EdgePercent >= 0 ? "text-success" : "text-danger") ms-1">@(sellTrade.EdgePercent >= 0 ? "+" : "")@sellTrade.EdgePercent.ToString("F1")%</span>
+                                                        <span class="text-muted ms-1 d-none d-lg-inline">(model @sellTrade.YourPercent.ToString("F1")% vs market @sellTrade.MarketPercent.ToString("F1")%)</span>
+                                                    </div>
+                                                }
+                                                else if (sellTrade.IsSync && !sellTrade.HasPnL)
+                                                {
+                                                    @* SYNC sell with unknown exit — no P&L data *@
+                                                    <div class="col-6 col-md-3">
+                                                        <span class="text-muted">Shares:</span>
+                                                        <span class="fw-semibold ms-1">@sellTrade.Shares</span>
+                                                    </div>
+                                                    <div class="col-6 col-md-3">
+                                                        <span class="text-muted">Entry:</span>
+                                                        <span class="fw-semibold ms-1">$@sellTrade.EntryPrice.ToString("F4")</span>
+                                                    </div>
+                                                    @if (!string.IsNullOrEmpty(sellTrade.ExitInfo))
+                                                    {
+                                                        <div class="col-6 col-md-3">
+                                                            <span class="text-muted">Exit:</span>
+                                                            <span class="fw-semibold text-warning ms-1">@sellTrade.ExitInfo</span>
+                                                        </div>
+                                                    }
+                                                    @if (!string.IsNullOrEmpty(sellTrade.SellReason))
+                                                    {
+                                                        <div class="col-12">
+                                                            <span class="text-muted">Reason:</span>
+                                                            <span class="text-warning ms-1">@sellTrade.SellReason</span>
+                                                        </div>
+                                                    }
+                                                    @if (!string.IsNullOrEmpty(sellTrade.Note))
+                                                    {
+                                                        <div class="col-12">
+                                                            <span class="text-muted fst-italic">@sellTrade.Note</span>
+                                                        </div>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    @* Regular SELL / EXTERNAL CLOSE / ADJUSTMENT with P&L data *@
+                                                    <div class="col-6 col-md-3">
+                                                        <span class="text-muted">Shares:</span>
+                                                        <span class="fw-semibold ms-1">@sellTrade.Shares</span>
+                                                    </div>
+                                                    <div class="col-6 col-md-3">
+                                                        <span class="text-muted">Entry:</span>
+                                                        <span class="fw-semibold ms-1">$@sellTrade.EntryPrice.ToString("F4")</span>
+                                                        <span class="text-muted mx-1">→</span>
+                                                        <span class="text-muted">Exit:</span>
+                                                        <span class="fw-semibold ms-1">$@sellTrade.CurrentPrice.ToString("F4")</span>
+                                                    </div>
+                                                    <div class="col-6 col-md-3">
+                                                        <span class="text-muted">P&amp;L:</span>
+                                                        <span class="fw-semibold ms-1 @(sellTrade.PnLAmount >= 0 ? "text-success" : "text-danger")">
+                                                            @(sellTrade.PnLAmount >= 0 ? "+" : "")$@sellTrade.PnLAmount.ToString("F2")
+                                                        </span>
+                                                    </div>
+                                                    @if (sellTrade.GrowthPercent != 0)
+                                                    {
+                                                        <div class="col-6 col-md-3">
+                                                            <span class="text-muted">Growth:</span>
+                                                            <span class="fw-semibold ms-1 @(sellTrade.GrowthPercent >= 0 ? "text-success" : "text-danger")">
+                                                                @(sellTrade.GrowthPercent >= 0 ? "+" : "")@sellTrade.GrowthPercent.ToString("F2")%
+                                                            </span>
+                                                        </div>
+                                                    }
+                                                    @if (!string.IsNullOrEmpty(sellTrade.SellEdgeRaw))
+                                                    {
+                                                        <div class="col-6 col-md-3">
+                                                            <span class="text-muted">Edge:</span>
+                                                            <span class="fw-semibold ms-1">@sellTrade.SellEdgeRaw</span>
+                                                        </div>
+                                                    }
+                                                    @if (!string.IsNullOrEmpty(sellTrade.SellReason))
+                                                    {
+                                                        <div class="col-6 col-md-3">
+                                                            <span class="text-muted">Reason:</span>
+                                                            <span class="fw-semibold text-warning ms-1">@sellTrade.SellReason</span>
+                                                        </div>
+                                                    }
+                                                }
+
+                                                @if (!string.IsNullOrEmpty(sellTrade.OrderId))
+                                                {
+                                                    <div class="col-12">
+                                                        <span class="text-muted">Order:</span>
+                                                        <code class="small ms-1 text-break">@sellTrade.OrderId</code>
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
                         </div>
                     }
                 </div>
             </div>
         </div>
     }
+
 }
 
 @code {
@@ -285,5 +445,49 @@ else
     private sealed class LoginModel
     {
         public string Password { get; set; } = "";
+    }
+
+    private sealed class TradePair
+    {
+        public required TradeEntry Buy { get; set; }
+        public TradeEntry? Sell { get; set; }
+    }
+
+    private List<TradePair> GroupTradesIntoPairs(List<TradeEntry> trades)
+    {
+        var pairs = new List<TradePair>();
+        var reversedTrades = Enumerable.Reverse(trades).ToList();
+        var i = 0;
+
+        while (i < reversedTrades.Count)
+        {
+            var trade = reversedTrades[i];
+
+            if (trade.IsBuy)
+            {
+                var pair = new TradePair { Buy = trade };
+
+                // Look for the next sell trade to pair with this buy
+                if (i + 1 < reversedTrades.Count && !reversedTrades[i + 1].IsBuy)
+                {
+                    pair.Sell = reversedTrades[i + 1];
+                    i += 2; // Skip the next trade since we've used it
+                }
+                else
+                {
+                    i++;
+                }
+
+                pairs.Add(pair);
+            }
+            else
+            {
+                // Unpaired sell (no buy before it), add as standalone
+                pairs.Add(new TradePair { Buy = trade, Sell = null });
+                i++;
+            }
+        }
+
+        return pairs;
     }
 }

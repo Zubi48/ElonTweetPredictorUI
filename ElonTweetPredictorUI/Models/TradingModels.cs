@@ -26,6 +26,7 @@ public class TradeEntry
     public decimal CurrentPrice { get; set; }
     public decimal PnLAmount { get; set; }
     public double PnLPercent { get; set; }
+    public double GrowthPercent { get; set; }
     public string SellEdgeRaw { get; set; } = "";
     public string SellReason { get; set; } = "";
     public string ExitInfo { get; set; } = "";

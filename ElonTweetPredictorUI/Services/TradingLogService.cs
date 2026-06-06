@@ -64,6 +64,10 @@ public sealed partial class TradingLogService : ITradingLogService
     [GeneratedRegex(@"│\s+P&L:\s+\$([+-]?[\d.]+)")]
     private static partial Regex TradePnLRegex();
 
+    // Growth: +29.87% on position
+    [GeneratedRegex(@"│\s+Growth:\s+([+-]?[\d.]+)\s*%")]
+    private static partial Regex TradeGrowthRegex();
+
     // SELL: Edge: -1.5 % | Reason: Edge flip
     [GeneratedRegex(@"│\s+Edge:\s+([+-]?[\d.]+\s*%)\s*\|\s*Reason:\s*(.+)")]
     private static partial Regex TradeSellEdgeRegex();
@@ -248,6 +252,14 @@ public sealed partial class TradingLogService : ITradingLogService
         {
             if (decimal.TryParse(m.Groups[1].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var pnl))
                 trade.PnLAmount = pnl;
+            return;
+        }
+
+        m = TradeGrowthRegex().Match(line);
+        if (m.Success)
+        {
+            if (double.TryParse(m.Groups[1].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var growth))
+                trade.GrowthPercent = growth;
             return;
         }
 
