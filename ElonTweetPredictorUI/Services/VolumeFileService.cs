@@ -1,6 +1,6 @@
 namespace ElonTweetPredictorUI.Services;
 
-public record VolumeFileInfo(string FileName, long SizeBytes, DateTime LastModifiedUtc);
+public record VolumeFileInfo(string FileName, long SizeBytes, DateTime LastModifiedUtc, bool Exists = true);
 
 public interface IVolumeFileService
 {
@@ -31,6 +31,12 @@ public class VolumeFileService : IVolumeFileService
         "simple-strategy-"
     ];
 
+    private static readonly HashSet<string> KnownUploadableFiles = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "elonmusk_tweet_history.csv",
+        "elonmusk_tweet_history_improved.csv"
+    };
+
     public VolumeFileService(IConfiguration configuration)
     {
         _dataPath = configuration["DataPath"] ?? ".";
@@ -38,18 +44,28 @@ public class VolumeFileService : IVolumeFileService
 
     public IReadOnlyList<VolumeFileInfo> ListFiles()
     {
-        if (!Directory.Exists(_dataPath))
-            return [];
+        var existingFiles = Directory.Exists(_dataPath)
+            ? Directory
+                .EnumerateFiles(_dataPath, "*", SearchOption.TopDirectoryOnly)
+                .Select(Path.GetFileName)
+                .Where(f => f is not null && !IsExcluded(f))
+                .Select(f =>
+                {
+                    var info = new FileInfo(Path.Combine(_dataPath, f!));
+                    return new VolumeFileInfo(f!, info.Length, info.LastWriteTimeUtc);
+                })
+                .ToList()
+            : [];
 
-        return Directory
-            .EnumerateFiles(_dataPath, "*", SearchOption.TopDirectoryOnly)
-            .Select(Path.GetFileName)
-            .Where(f => f is not null && !IsExcluded(f))
-            .Select(f =>
-            {
-                var info = new FileInfo(Path.Combine(_dataPath, f!));
-                return new VolumeFileInfo(f!, info.Length, info.LastWriteTimeUtc);
-            })
+        var existingNames = existingFiles.Select(f => f.FileName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var stubs = KnownUploadableFiles
+            .Where(f => !existingNames.Contains(f))
+            .Select(f => new VolumeFileInfo(f, 0, DateTime.MinValue, Exists: false));
+
+        return existingFiles
+            .Concat(stubs)
             .OrderBy(f => f.FileName, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
