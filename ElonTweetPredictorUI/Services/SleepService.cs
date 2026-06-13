@@ -56,6 +56,11 @@ public partial class SleepService : ISleepService
     [GeneratedRegex(@"Clock regime\s*:\s*(.+)", RegexOptions.Compiled)]
     private static partial Regex RegimeRegex();
 
+    // Fixes "01:00 PM" -> "01:00 AM" for post-midnight hours (12 AM – 5 AM) that the
+    // Python script sometimes stamps as PM due to a 12-hour clock rollover bug.
+    [GeneratedRegex(@"\b(0?[1-5])(:(\d{2})) PM\b", RegexOptions.Compiled)]
+    private static partial Regex PostMidnightPmFixRegex();
+
     [GeneratedRegex(@"Activity \(24h, dur\.\)\s*:\s*.*tier\s+(\w+)", RegexOptions.Compiled)]
     private static partial Regex ActivityTierRegex();
 
@@ -248,17 +253,17 @@ public partial class SleepService : ISleepService
 
     private static bool ParseEstimateLine(string line, CurrentSleepEstimate e)
     {
-        if (Match(NowRegex(), line, out var v))           { e.NowEst = v; return true; }
-        if (Match(LastTweetRegex(), line, out v))          { e.LastTweetEst = v; return true; }
-        if (Match(SilenceRegex(), line, out v))            { e.SilenceSoFar = v; return true; }
-        if (Match(RegimeRegex(), line, out v))             { e.ClockRegime = v; return true; }
-        if (Match(ActivityTierRegex(), line, out v))       { e.ActivityTier = v; return true; }
-        if (Match(MedianRegex(), line, out v))             { e.NextTweetMedian = v; return true; }
-        if (Match(Interval50Regex(), line, out v))         { e.NextTweet50Interval = v; return true; }
-        if (Match(Pct90Regex(), line, out v))              { e.NextTweet90Pct = v; return true; }
-        if (Match(BranchTweetsRegex(), line, out v))       { e.BranchIfTweetsAgain = v; return true; }
-        if (Match(BranchSilentRegex(), line, out v))       { e.BranchIfSilentTillMorning = v; return true; }
-        if (Match(BranchWeightedRegex(), line, out v))     { e.BranchWeightedMean = v; return true; }
+        if (TryMatch(NowRegex(), line, out var v))           { e.NowEst = v; return true; }
+        if (TryMatch(LastTweetRegex(), line, out v))          { e.LastTweetEst = v; return true; }
+        if (TryMatch(SilenceRegex(), line, out v))            { e.SilenceSoFar = v; return true; }
+        if (TryMatch(RegimeRegex(), line, out v))             { e.ClockRegime = FixPostMidnightPm(v); return true; }
+        if (TryMatch(ActivityTierRegex(), line, out v))       { e.ActivityTier = v; return true; }
+        if (TryMatch(MedianRegex(), line, out v))             { e.NextTweetMedian = v; return true; }
+        if (TryMatch(Interval50Regex(), line, out v))         { e.NextTweet50Interval = v; return true; }
+        if (TryMatch(Pct90Regex(), line, out v))              { e.NextTweet90Pct = v; return true; }
+        if (TryMatch(BranchTweetsRegex(), line, out v))       { e.BranchIfTweetsAgain = v; return true; }
+        if (TryMatch(BranchSilentRegex(), line, out v))       { e.BranchIfSilentTillMorning = v; return true; }
+        if (TryMatch(BranchWeightedRegex(), line, out v))     { e.BranchWeightedMean = v; return true; }
 
         var asleep = AsleepRegex().Match(line);
         if (asleep.Success)
@@ -281,12 +286,17 @@ public partial class SleepService : ISleepService
         return false;
     }
 
-    private static bool Match(Regex regex, string line, out string value)
+    private static bool TryMatch(Regex regex, string line, out string value)
     {
         var m = regex.Match(line);
         value = m.Success ? m.Groups[1].Value.Trim() : "";
         return m.Success;
     }
+
+    // Corrects "01:00 PM" -> "01:00 AM" for post-midnight hours (1–5 AM) that the
+    // Python script sometimes labels as PM due to a 12-hour clock rollover bug.
+    private static string FixPostMidnightPm(string s) =>
+        PostMidnightPmFixRegex().Replace(s, m => $"{m.Groups[1].Value}{m.Groups[2].Value} AM");
 
     private static double ParseD(string s) =>
         double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var d) ? d : 0;
