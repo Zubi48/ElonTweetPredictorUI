@@ -135,6 +135,10 @@ public class DataFileService : IDataFileService
             return null;
         }
 
+        var namedCsv = Path.Combine(_dataPath, "elonmusk_tweet_history.csv");
+        if (File.Exists(namedCsv))
+            return namedCsv;
+
         return Directory.EnumerateFiles(_dataPath, "*.csv", SearchOption.TopDirectoryOnly)
             .OrderByDescending(File.GetLastWriteTimeUtc)
             .FirstOrDefault();
