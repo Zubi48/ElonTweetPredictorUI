@@ -28,6 +28,7 @@ builder.Services.AddSingleton<ITradingLogService, TradingLogService>();
 builder.Services.AddSingleton<ISleepService, SleepService>();
 builder.Services.AddSingleton<ITweetHeatmapService, TweetHeatmapService>();
 builder.Services.AddSingleton<ITradingChangeNotifier, TradingChangeNotifier>();
+builder.Services.AddSingleton<IVolumeFileService, VolumeFileService>();
 builder.Services.AddHostedService<LogConverterService>();
 builder.Services.AddSignalR();
 builder.Services.AddHostedService<SignalRBridgeService>();
@@ -63,7 +64,8 @@ app.UseWhen(
     context => !context.Request.Path.StartsWithSegments("/api")
             && !context.Request.Path.StartsWithSegments("/hubs")
             && !context.Request.Path.StartsWithSegments("/downloads")
-            && !context.Request.Path.StartsWithSegments("/data-image"),
+            && !context.Request.Path.StartsWithSegments("/data-image")
+            && !context.Request.Path.StartsWithSegments("/file-manager"),
     branch => branch.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true));
 
 app.UseAntiforgery();
@@ -83,6 +85,29 @@ app.MapGet("/downloads/{fileType}", async (string fileType, IDataFileService dat
 
     var stream = new FileStream(result.FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
     return Results.File(stream, result.ContentType, result.DownloadFileName);
+});
+
+app.MapGet("/file-manager/download/{filename}", (string filename, IVolumeFileService volumeFileService) =>
+{
+    var path = volumeFileService.ResolveDownloadPath(filename);
+    if (path is null)
+        return Results.NotFound();
+
+    var ext = Path.GetExtension(filename).ToLowerInvariant();
+    var contentType = ext switch
+    {
+        ".csv"   => "text/csv",
+        ".log"   => "text/plain",
+        ".txt"   => "text/plain",
+        ".json"  => "application/json",
+        ".jsonl" => "application/x-ndjson",
+        ".png"   => "image/png",
+        ".pkl"   => "application/octet-stream",
+        _        => "application/octet-stream"
+    };
+
+    var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+    return Results.File(stream, contentType, filename);
 });
 
 app.MapGet("/data-image/{filename}", (string filename, IConfiguration config) =>

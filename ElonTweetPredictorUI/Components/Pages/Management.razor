@@ -5,6 +5,7 @@
 @inject IModelFileService ModelFileService
 @inject IContainerRestartService ContainerRestartService
 @inject IDataChangeNotifier DataChangeNotifier
+@inject IVolumeFileService VolumeFileService
 
 <PageTitle>Management</PageTitle>
 
@@ -178,6 +179,72 @@ else
     </div>
 }
 
+<div class="card bg-dark border-secondary mb-4">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="card-title mb-0">📂 Volume File Manager</h6>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="RefreshVolumeFiles">↻ Refresh</button>
+        </div>
+        @if (_volumeFiles.Count == 0)
+        {
+            <div class="small text-muted fst-italic">No files found in the data volume.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm table-dark table-borderless mb-0">
+                    <thead>
+                        <tr class="text-muted small">
+                            <th>File</th>
+                            <th class="text-end">Size</th>
+                            <th class="text-end">Modified (UTC)</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var file in _volumeFiles)
+                        {
+                            <tr>
+                                <td class="small"><code>@file.FileName</code></td>
+                                <td class="small text-muted text-end text-nowrap">@FormatFileSize(file.SizeBytes)</td>
+                                <td class="small text-muted text-end text-nowrap">@file.LastModifiedUtc.ToString("MMM dd HH:mm")</td>
+                                <td class="text-end text-nowrap">
+                                    <a class="btn btn-outline-info btn-sm me-1"
+                                       href="/file-manager/download/@Uri.EscapeDataString(file.FileName)"
+                                       download="@file.FileName">⬇</a>
+                                    @if (_confirmDeleteFile == file.FileName)
+                                    {
+                                        <span class="small text-warning me-1">Delete?</span>
+                                        <button class="btn btn-danger btn-sm me-1"
+                                                @onclick="() => OnVolumeFileDeleteConfirmed(file.FileName)"
+                                                disabled="@_fileDeleteInProgress">Yes</button>
+                                        <button class="btn btn-outline-secondary btn-sm"
+                                                @onclick="() => _confirmDeleteFile = null"
+                                                disabled="@_fileDeleteInProgress">No</button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-outline-danger btn-sm"
+                                                @onclick="() => { _confirmDeleteFile = file.FileName; _fileDeleteMessage = null; }">🗑</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        @if (_fileDeleteInProgress)
+        {
+            <div class="small text-info mt-2">Deleting...</div>
+        }
+        else if (!string.IsNullOrWhiteSpace(_fileDeleteMessage))
+        {
+            <div class="small mt-2 @(_fileDeleteIsError ? "text-danger" : "text-success")">@_fileDeleteMessage</div>
+        }
+    </div>
+</div>
+
 @code {
     private PredictorStatus? _status;
     private bool _modelUploadInProgress;
@@ -194,10 +261,16 @@ else
     private bool _restartInProgress;
     private string? _restartMessage;
     private bool _restartIsError;
+    private IReadOnlyList<VolumeFileInfo> _volumeFiles = [];
+    private string? _confirmDeleteFile;
+    private bool _fileDeleteInProgress;
+    private string? _fileDeleteMessage;
+    private bool _fileDeleteIsError;
 
     protected override async Task OnInitializedAsync()
     {
         await RefreshStatusAsync();
+        RefreshVolumeFiles();
         DataChangeNotifier.DataChanged += HandleDataChangedAsync;
     }
 
@@ -206,6 +279,7 @@ else
         await InvokeAsync(async () =>
         {
             await RefreshStatusAsync();
+            RefreshVolumeFiles();
             StateHasChanged();
         });
     }
@@ -337,6 +411,34 @@ else
             StateHasChanged();
         }
     }
+
+    private void RefreshVolumeFiles()
+    {
+        _volumeFiles = VolumeFileService.ListFiles();
+    }
+
+    private void OnVolumeFileDeleteConfirmed(string fileName)
+    {
+        _fileDeleteInProgress = true;
+        _confirmDeleteFile = null;
+        _fileDeleteMessage = null;
+        _fileDeleteIsError = false;
+
+        var result = VolumeFileService.DeleteFile(fileName);
+        _fileDeleteIsError = !result.Success;
+        _fileDeleteMessage = result.Message;
+        if (result.Success)
+            RefreshVolumeFiles();
+
+        _fileDeleteInProgress = false;
+    }
+
+    private static string FormatFileSize(long bytes) => bytes switch
+    {
+        < 1024           => $"{bytes} B",
+        < 1024 * 1024    => $"{bytes / 1024.0:F1} KB",
+        _                => $"{bytes / (1024.0 * 1024):F1} MB"
+    };
 
     public void Dispose()
     {
