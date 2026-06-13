@@ -35,9 +35,26 @@ else
                     <span class="text-muted small ms-2">@_est.ClockRegime</span>
                 }
             </div>
-            <div class="text-muted small">Parsed @_data.ParsedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</div>
+            <div class="text-muted small">
+                @if (_est?.AnalysisUtc is not null)
+                {
+                    @($"Analysis at {TimeZoneInfo.ConvertTimeFromUtc(_est.AnalysisUtc.Value, _estZone):yyyy-MM-dd HH:mm} EST")
+                }
+                else
+                {
+                    @($"Parsed {_data.ParsedAt.ToLocalTime():yyyy-MM-dd HH:mm}")
+                }
+            </div>
         </div>
     </div>
+
+    @if (_est?.DataAge is TimeSpan age && age.TotalHours >= 2)
+    {
+        <div class="alert alert-warning py-2 px-3 mb-3" role="alert">
+            ⚠️ <strong>Stale data</strong> — analysis is @FormatAge(age) old (ran at @_est.NowEst EST).
+            The signal below reflects conditions at that time, not right now.
+        </div>
+    }
 
     @if (_est is not null)
     {
@@ -215,6 +232,9 @@ else
 }
 
 @code {
+    private static readonly TimeZoneInfo _estZone =
+        TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
+
     private bool _loading = true;
     private SleepData? _data;
     private CurrentSleepEstimate? _est;
@@ -327,5 +347,12 @@ else
         if (string.IsNullOrWhiteSpace(full)) return "—";
         var idx = full.IndexOf(" EST", StringComparison.OrdinalIgnoreCase);
         return idx > 0 ? full[..idx] : full;
+    }
+
+    private static string FormatAge(TimeSpan age)
+    {
+        if (age.TotalDays >= 1) return $"{(int)age.TotalDays}d {age.Hours}h";
+        if (age.TotalHours >= 1) return $"{(int)age.TotalHours}h {age.Minutes}m";
+        return $"{age.Minutes}m";
     }
 }

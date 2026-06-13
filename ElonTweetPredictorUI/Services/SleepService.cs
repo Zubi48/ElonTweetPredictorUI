@@ -253,7 +253,19 @@ public partial class SleepService : ISleepService
 
     private static bool ParseEstimateLine(string line, CurrentSleepEstimate e)
     {
-        if (TryMatch(NowRegex(), line, out var v))           { e.NowEst = v; return true; }
+        if (TryMatch(NowRegex(), line, out var v))
+        {
+            e.NowEst = v;
+            // "Saturday 2026-06-13 01:00 AM" – parse as EST and convert to UTC
+            if (DateTime.TryParseExact(v, ["dddd yyyy-MM-dd hh:mm tt", "dddd yyyy-MM-dd h:mm tt"],
+                    CultureInfo.InvariantCulture, DateTimeStyles.None, out var local))
+            {
+                var est = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
+                e.AnalysisUtc = TimeZoneInfo.ConvertTimeToUtc(
+                    DateTime.SpecifyKind(local, DateTimeKind.Unspecified), est);
+            }
+            return true;
+        }
         if (TryMatch(LastTweetRegex(), line, out v))          { e.LastTweetEst = v; return true; }
         if (TryMatch(SilenceRegex(), line, out v))            { e.SilenceSoFar = v; return true; }
         if (TryMatch(RegimeRegex(), line, out v))             { e.ClockRegime = FixPostMidnightPm(v); return true; }

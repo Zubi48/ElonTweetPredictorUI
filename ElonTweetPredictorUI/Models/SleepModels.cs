@@ -58,6 +58,12 @@ public class CurrentSleepEstimate
     public string BranchWeightedMean { get; set; } = "";
 
     public double AwakeProbability => Math.Round(100.0 - AsleepProbability, 1);
+
+    /// <summary>UTC time the Python script ran the analysis (parsed from NowEst).</summary>
+    public DateTime? AnalysisUtc { get; set; }
+
+    /// <summary>How old the analysis is relative to now. Null if AnalysisUtc is unavailable.</summary>
+    public TimeSpan? DataAge => AnalysisUtc.HasValue ? DateTime.UtcNow - AnalysisUtc.Value : null;
 }
 
 public class SleepData
