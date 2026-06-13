@@ -35,16 +35,17 @@
 .metric-label  { font-size: 0.72rem; text-transform: uppercase; color: #6c757d; letter-spacing: 0.05em; }
 .metric-value  { font-size: 1.35rem; font-weight: 600; color: #f8f9fa; }
 
-/* ── Extremes grid ── */
-.extreme-item {
+/* ── Detail grid (next-tweet forecast) ── */
+.detail-item {
     display: flex;
     flex-direction: column;
     background: rgba(255,255,255,0.04);
     border-radius: 0.35rem;
     padding: 0.5rem 0.75rem;
+    height: 100%;
 }
-.extreme-label { font-size: 0.72rem; color: #6c757d; }
-.extreme-value { font-size: 0.88rem; font-weight: 500; word-break: break-word; }
+.detail-label { font-size: 0.72rem; color: #6c757d; }
+.detail-value { font-size: 0.88rem; font-weight: 500; word-break: break-word; }
 
 /* ── Sleep table ── */
 .sleep-table { font-size: 0.82rem; }

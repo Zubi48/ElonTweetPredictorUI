@@ -51,77 +51,71 @@ public static class TradingPayload
 
     private static object BuildSleepContext(SleepData? data)
     {
-        if (data is null || data.Periods.Count == 0)
+        if (data?.CurrentEstimate is not { } est)
             return new { available = false };
 
-        var estNow   = TimeZoneInfo.ConvertTime(DateTime.UtcNow, Est);
-        var nowTime  = TimeOnly.FromDateTime(estNow);
+        var estNow = TimeZoneInfo.ConvertTime(DateTime.UtcNow, Est);
 
-        // Most-recent sleep period
-        var last = data.Periods
-            .OrderByDescending(p => p.Date)
-            .First();
-
-        // Is Elon likely asleep right now?
-        // Use the rolling 7-night average sleep window projected onto today.
-        // This always produces a result regardless of how stale the last record is.
-        // We compute it after the rolling avg is built below, so defer with a local func.
-
-        // Average bedtime/wake from last 7 nights
-        var recent = data.Periods
-            .OrderByDescending(p => p.Date)
-            .Take(7)
-            .ToList();
-
-        var avgBedMins  = recent.Average(p => ToMinutes(p.Bedtime));
-        var avgWakeMins = recent.Average(p => ToMinutes(p.WakeTime));
-        var avgDuration = recent.Average(p => p.DurationHours);
-
-        // Expected tonight window (uses 7-night rolling avg)
-        var expectedBedtime  = MinutesToTimeOnly((int)avgBedMins);
-        var expectedWakeTime = MinutesToTimeOnly((int)avgWakeMins);
-
-        // Time until expected bedtime / wake
-        double hoursUntilBed  = HoursUntil(nowTime, expectedBedtime);
-        double hoursUntilWake = HoursUntil(nowTime, expectedWakeTime);
-
-        // Derive is_asleep_now from the rolling-avg window (always available)
-        // Falls back to last known period if we have a same/previous-day record
-        bool isAsleepNow = IsDuringWindow(nowTime, expectedBedtime, expectedWakeTime);
+        // Weekday summary that matches the night's starting day, preferring
+        // non-launch (the common case) when both groups are present.
+        var weekdayName = ExtractWeekday(est.ClockRegime, est.NowEst) ?? estNow.DayOfWeek.ToString();
+        var weekday = data.WeekdaySummaries
+            .Where(w => w.Weekday.Equals(weekdayName, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(w => w.IsLaunch ? 1 : 0)
+            .FirstOrDefault();
 
         return new
         {
-            available         = true,
-            is_asleep_now     = isAsleepNow,
-            is_asleep_based_on = "rolling_7_night_avg",
-            last_known = new
+            available = true,
+            is_asleep_now = est.AsleepProbability >= 50,
+            p_asleep_now_pct = est.AsleepProbability,
+            p_asleep_band = new { low = est.AsleepLow, high = est.AsleepHigh },
+            p_no_tweets_until_5am_pct = est.NoTweetsUntil5Probability,
+            p_no_tweets_until_5am_band = new { low = est.NoTweets5Low, high = est.NoTweets5High },
+            now_est = est.NowEst,
+            last_tweet_est = est.LastTweetEst,
+            silence_so_far = est.SilenceSoFar,
+            clock_regime = est.ClockRegime,
+            activity_tier = est.ActivityTier,
+            next_tweet = new
             {
-                date          = last.Date.ToString("yyyy-MM-dd"),
-                bedtime       = last.BedtimeStr,
-                wake_time     = last.WakeTimeStr,
-                duration_hours = last.DurationHours
+                median = est.NextTweetMedian,
+                interval_50 = est.NextTweet50Interval,
+                pct_90 = est.NextTweet90Pct,
+                if_tweets_again = est.BranchIfTweetsAgain,
+                if_silent_until_morning = est.BranchIfSilentTillMorning,
+                weighted_mean = est.BranchWeightedMean
             },
-            rolling_7_night_avg = new
+            weekday_profile = weekday is null ? null : new
             {
-                bedtime        = expectedBedtime.ToString("hh:mm tt") + " EST",
-                wake_time      = expectedWakeTime.ToString("hh:mm tt") + " EST",
-                duration_hours = Math.Round(avgDuration, 1)
+                weekday = weekday.Weekday,
+                nights = weekday.Nights,
+                avg_bedtime = weekday.AvgBedtime,
+                avg_wakeup = weekday.AvgWakeUp,
+                avg_sleep_hours = weekday.AvgSleepHours
             },
-            hours_until_expected_bedtime  = Math.Round(hoursUntilBed,  1),
-            hours_until_expected_wakeup   = Math.Round(hoursUntilWake, 1),
-            // Actionable signal for the bot
-            activity_signal = DeriveActivitySignal(isAsleepNow, hoursUntilBed, hoursUntilWake)
+            activity_signal = DeriveActivitySignal(est)
         };
     }
 
-    private static string DeriveActivitySignal(bool asleep, double hBed, double hWake)
+    private static string DeriveActivitySignal(CurrentSleepEstimate e)
     {
-        if (asleep)          return "SLEEPING — expect very low tweet volume";
-        if (hBed  < 1.0)     return "APPROACHING_SLEEP — activity likely declining";
-        if (hWake < 2.0)     return "JUST_WOKE — activity likely ramping up";
-        return "AWAKE — normal activity expected";
+        if (e.AsleepProbability >= 80) return "SLEEPING - expect very low tweet volume";
+        if (e.AsleepProbability >= 55) return "LIKELY_SLEEPING - activity probably suppressed";
+        if (e.AsleepProbability >= 45) return "UNCERTAIN - could go either way";
+        return "AWAKE - normal activity expected";
     }
 
+    /// <summary>Pull a weekday name out of the v2 estimate text (e.g. "Saturday 2026-06-13 ...").</summary>
+    private static string? ExtractWeekday(params string[] sources)
+    {
+        string[] days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+        foreach (var s in sources)
+            foreach (var d in days)
+                if (!string.IsNullOrEmpty(s) && s.Contains(d, StringComparison.OrdinalIgnoreCase))
+                    return d;
+        return null;
+    }
     // ── Tweet activity / heatmap signals ─────────────────────────────────────
 
     private static object BuildTweetActivity(HeatmapData? hm)
@@ -215,25 +209,5 @@ public static class TradingPayload
     };
 
     // ── Helpers ───────────────────────────────────────────────────────────────
-    private static bool IsDuringWindow(TimeOnly t, TimeOnly bed, TimeOnly wake)
-        => bed <= wake
-            ? t >= bed && t < wake
-            : t >= bed || t < wake;
-
-    private static int ToMinutes(TimeOnly t) => t.Hour * 60 + t.Minute;
-
-    private static TimeOnly MinutesToTimeOnly(int mins)
-    {
-        // Keep in 0-1439 range
-        mins = ((mins % 1440) + 1440) % 1440;
-        return new TimeOnly(mins / 60, mins % 60);
     }
-
-    private static double HoursUntil(TimeOnly from, TimeOnly target)
-    {
-        var diff = target.ToTimeSpan() - from.ToTimeSpan();
-        if (diff < TimeSpan.Zero) diff += TimeSpan.FromHours(24);
-        return diff.TotalHours;
-    }
-}
 

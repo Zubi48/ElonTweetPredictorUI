@@ -314,21 +314,49 @@ else
     private void ApplySleepOverlay(SleepData sleepData)
     {
         _heatmap!.SleepingCells.Clear();
-        var byDate = sleepData.Periods.GroupBy(p => p.Date)
-                               .ToDictionary(g => g.Key, g => g.First());
+        if (sleepData.WeekdaySummaries.Count == 0)
+            return;
+
+        // Build a weekday -> (bedtime, waketime) map from the per-weekday averages.
+        // Prefer non-launch days (the common case) when both groups exist.
+        var byWeekday = sleepData.WeekdaySummaries
+            .GroupBy(w => w.Weekday)
+            .ToDictionary(
+                g => g.Key,
+                g =>
+                {
+                    var w = g.OrderBy(x => x.IsLaunch ? 1 : 0).First();
+                    return (Bed: ParseAvgTime(w.AvgBedtime), Wake: ParseAvgTime(w.AvgWakeUp));
+                });
+
         foreach (var col in _heatmap.Days)
         {
-            if (!byDate.TryGetValue(col.Date, out var period)) continue;
+            var weekday = col.Date.DayOfWeek.ToString();
+            if (!byWeekday.TryGetValue(weekday, out var win)) continue;
+            if (win.Bed is not { } bed || win.Wake is not { } wake) continue;
+
             for (var h = 0; h < 24; h++)
             {
                 var t = new TimeOnly(h, 0);
-                bool asleep = period.Bedtime <= period.WakeTime
-                    ? t >= period.Bedtime && t < period.WakeTime
-                    : t >= period.Bedtime || t < period.WakeTime;
+                bool asleep = bed <= wake
+                    ? t >= bed && t < wake
+                    : t >= bed || t < wake;
                 if (asleep)
                     _heatmap.SleepingCells.Add((col.Date, h));
             }
         }
+    }
+
+    /// <summary>Parse an average time like "02:28 AM" into TimeOnly (null if unparseable).</summary>
+    private static TimeOnly? ParseAvgTime(string s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return null;
+        var clean = s.Replace("EST", "").Trim();
+        return TimeOnly.TryParseExact(clean, "hh:mm tt",
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out var t)
+            ? t
+            : null;
     }
 
     private static string CellStyle(int count, double intensity, bool sleeping)

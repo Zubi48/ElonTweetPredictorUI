@@ -1,46 +1,69 @@
 namespace ElonTweetPredictorUI.Models;
 
-public class SleepPeriod
+/// <summary>
+/// Per-weekday sleep summary parsed from the v2 report. Captured for both
+/// LAUNCH and NON-LAUNCH day groups (distinguished by <see cref="IsLaunch"/>).
+/// </summary>
+public class WeekdaySleepSummary
 {
-    public DateOnly Date { get; set; }
-    public string Weekday { get; set; } = "";
-    public string BedtimeStr { get; set; } = "";   // e.g. "02:39 AM EST"
-    public string WakeTimeStr { get; set; } = "";  // e.g. "08:46 AM EST"
-    public double DurationHours { get; set; }
-    public int BedTweets { get; set; }
-    public int MornTweets { get; set; }
-
-    /// <summary>Bedtime as TimeOnly (parsed, hour in 0-23).</summary>
-    public TimeOnly Bedtime { get; set; }
-    /// <summary>Wake time as TimeOnly (parsed, hour in 0-23).</summary>
-    public TimeOnly WakeTime { get; set; }
-}
-
-public class WeekSummary
-{
-    public string WeekLabel { get; set; } = "";   // e.g. "2026-W17"
+    public string Weekday { get; set; } = "";       // e.g. "Monday"
+    public bool IsLaunch { get; set; }
     public int Nights { get; set; }
-    public string Weekdays { get; set; } = "";
-    public string AvgBedtime { get; set; } = "";
-    public string AvgWakeUp { get; set; } = "";
+    public string AvgBedtime { get; set; } = "";    // e.g. "02:28 AM"
+    public string AvgWakeUp { get; set; } = "";     // e.g. "11:31 AM"
     public double AvgSleepHours { get; set; }
+    public double MinSleepHours { get; set; }
+    public double MaxSleepHours { get; set; }
 }
 
-public class SleepExtremes
+/// <summary>
+/// One "down-for-the-night confirmation" row: how much silence after a tweet
+/// at <see cref="LastTweet"/> is needed to reach each probability target.
+/// </summary>
+public class ConfirmationThreshold
 {
-    public string LatestBedtime { get; set; } = "";
-    public string EarliestBedtime { get; set; } = "";
-    public string EarliestWakeUp { get; set; } = "";
-    public string LatestWakeUp { get; set; } = "";
-    public string LongestSleep { get; set; } = "";
-    public string ShortestSleep { get; set; } = "";
+    public string Weekday { get; set; } = "";       // e.g. "Friday"
+    public string LastTweet { get; set; } = "";     // e.g. "11:00 PM"
+    public string Target80 { get; set; } = "";      // e.g. "3h45m"
+    public string Target90 { get; set; } = "";
+    public string Target95 { get; set; } = "";
+}
+
+/// <summary>
+/// The headline "CURRENT SLEEP-STATE ESTIMATE (v2)" block - the single most
+/// useful piece of the report for live decisions.
+/// </summary>
+public class CurrentSleepEstimate
+{
+    public string NowEst { get; set; } = "";            // "Saturday 2026-06-13 01:00 AM"
+    public string LastTweetEst { get; set; } = "";      // "Friday 2026-06-12 10:15 PM"
+    public string SilenceSoFar { get; set; } = "";      // "2h45m"
+    public string ClockRegime { get; set; } = "";       // "NIGHT - inside sleep zone (...)"
+    public string ActivityTier { get; set; } = "";      // "MID" (from "34 tweets -> tier MID")
+
+    public double AsleepProbability { get; set; }       // 76.4
+    public double AsleepLow { get; set; }               // 59.1
+    public double AsleepHigh { get; set; }              // 90.1
+
+    public double NoTweetsUntil5Probability { get; set; } // 56.0
+    public double NoTweets5Low { get; set; }              // 37.4
+    public double NoTweets5High { get; set; }             // 73.6
+
+    public string NextTweetMedian { get; set; } = "";        // "02:18 AM EST (Sat 06/13)"
+    public string NextTweet50Interval { get; set; } = "";    // "01:20 AM - 03:10 AM EST (...)"
+    public string NextTweet90Pct { get; set; } = "";         // "05:23 AM EST (Sat 06/13)"
+
+    public string BranchIfTweetsAgain { get; set; } = "";    // "~ 01:26 AM EST (Sat 06/13)"
+    public string BranchIfSilentTillMorning { get; set; } = "";
+    public string BranchWeightedMean { get; set; } = "";
+
+    public double AwakeProbability => Math.Round(100.0 - AsleepProbability, 1);
 }
 
 public class SleepData
 {
-    public int TotalSleepPeriods { get; set; }
-    public List<SleepPeriod> Periods { get; set; } = [];
-    public List<WeekSummary> WeekSummaries { get; set; } = [];
-    public SleepExtremes Extremes { get; set; } = new();
+    public CurrentSleepEstimate? CurrentEstimate { get; set; }
+    public List<WeekdaySleepSummary> WeekdaySummaries { get; set; } = [];
+    public List<ConfirmationThreshold> Thresholds { get; set; } = [];
     public DateTime ParsedAt { get; set; }
 }
