@@ -62,7 +62,8 @@ app.UseSwaggerUI(options =>
 app.UseWhen(
     context => !context.Request.Path.StartsWithSegments("/api")
             && !context.Request.Path.StartsWithSegments("/hubs")
-            && !context.Request.Path.StartsWithSegments("/downloads"),
+            && !context.Request.Path.StartsWithSegments("/downloads")
+            && !context.Request.Path.StartsWithSegments("/data-image"),
     branch => branch.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true));
 
 app.UseAntiforgery();
@@ -82,6 +83,33 @@ app.MapGet("/downloads/{fileType}", async (string fileType, IDataFileService dat
 
     var stream = new FileStream(result.FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
     return Results.File(stream, result.ContentType, result.DownloadFileName);
+});
+
+app.MapGet("/data-image/{filename}", (string filename, IConfiguration config) =>
+{
+    if (filename.Contains('/') || filename.Contains('\\') || filename.Contains(".."))
+        return Results.BadRequest();
+
+    var ext = Path.GetExtension(filename).ToLowerInvariant();
+    if (ext is not (".png" or ".jpg" or ".jpeg" or ".gif" or ".webp"))
+        return Results.BadRequest();
+
+    var dataPath = config["DataPath"] ?? ".";
+    var filePath = Path.Combine(dataPath, filename);
+
+    if (!File.Exists(filePath))
+        return Results.NotFound();
+
+    var contentType = ext switch
+    {
+        ".jpg" or ".jpeg" => "image/jpeg",
+        ".gif"            => "image/gif",
+        ".webp"           => "image/webp",
+        _                 => "image/png"
+    };
+
+    var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+    return Results.File(stream, contentType);
 });
 
 app.MapRazorComponents<App>()

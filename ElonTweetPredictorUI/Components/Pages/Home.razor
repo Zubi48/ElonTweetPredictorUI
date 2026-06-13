@@ -146,11 +146,22 @@ else
         </div>
     }
 
+    <div class="card bg-dark border-secondary mb-4">
+        <div class="card-body">
+            <h6 class="card-title mb-3">📈 Anomaly Dashboard</h6>
+            <img src="/data-image/anomaly_dashboard.png?v=@_imageKey"
+                 class="img-fluid w-100"
+                 alt="Anomaly Dashboard"
+                 style="border-radius: 4px;" />
+        </div>
+    </div>
+
     }
 
 @code {
     private PredictorStatus? _status;
     private bool _initialLoadCompleted;
+    private int _imageKey;
 
     protected override async Task OnInitializedAsync()
     {
@@ -163,6 +174,7 @@ else
         await InvokeAsync(async () =>
         {
             await RefreshData();
+            _imageKey++;
             StateHasChanged();
         });
     }
