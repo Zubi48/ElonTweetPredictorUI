@@ -1,183 +1,10 @@
 @page "/management"
 @rendermode InteractiveServer
 @implements IDisposable
-@inject IStatusService StatusService
-@inject IModelFileService ModelFileService
-@inject IContainerRestartService ContainerRestartService
 @inject IDataChangeNotifier DataChangeNotifier
 @inject IVolumeFileService VolumeFileService
 
 <PageTitle>Management</PageTitle>
-
-@if (_status is null)
-{
-    <div class="alert alert-warning" role="alert">
-        Status data is not available yet. Management options will appear once <code>tweet_predictor.log</code> is available.
-    </div>
-}
-else
-{
-    <div class="card bg-dark border-secondary mb-4">
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h6 class="card-title mb-0">⚙️ Management</h6>
-                <span class="small text-muted">Live updates enabled</span>
-            </div>
-
-            <h6 class="card-title mb-3">📁 Data Files</h6>
-            <table class="table table-sm table-dark table-borderless mb-0">
-                <tbody>
-                    <tr>
-                        <td class="text-muted">CSV</td>
-                        <td class="text-end"><code class="small">@Path.GetFileName(_status.Files.Csv)</code></td>
-                    </tr>
-                    <tr>
-                        <td class="text-muted">Model</td>
-                        <td class="text-end"><code class="small">@Path.GetFileName(_status.Files.Model)</code></td>
-                    </tr>
-                    <tr>
-                        <td class="text-muted">Logs JSON</td>
-                        <td class="text-end"><code class="small">logs.json</code></td>
-                    </tr>
-                    <tr>
-                        <td class="text-muted">Predictor Log</td>
-                        <td class="text-end"><code class="small">tweet_predictor.log</code></td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <div class="mt-3 pt-3 border-top border-secondary-subtle">
-                <h6 class="mb-2">⬇️ Downloads</h6>
-                <div class="d-flex flex-wrap gap-2">
-                    <a class="btn btn-outline-info btn-sm" href="/downloads/csv">Download CSV</a>
-                    <a class="btn btn-outline-info btn-sm" href="/downloads/model">Download Model (.pkl)</a>
-                    <a class="btn btn-outline-info btn-sm" href="/downloads/logsjson">Download logs.json</a>
-                    <a class="btn btn-outline-info btn-sm" href="/downloads/predictorlog">Download tweet_predictor.log</a>
-                    <a class="btn btn-outline-info btn-sm" href="/downloads/tradeslog">Download trades.log</a>
-                </div>
-            </div>
-
-            <div class="mt-3 pt-3 border-top border-secondary-subtle">
-                <h6 class="mb-2">🔁 Replace model file</h6>
-                <p class="small text-muted mb-2">
-                    Upload a new <code>.pkl</code> or <code>.pkg</code> file to replace <code>bayesian_model.pkl</code>.
-                    The UI will also write <code>reload.flag</code> so the Python service reloads it.
-                </p>
-                <InputFile OnChange="OnModelFileSelected"
-                           accept=".pkl,.plk,.pkg"
-                           class="form-control form-control-sm"
-                           disabled="@_modelUploadInProgress" />
-
-                @if (_modelUploadInProgress)
-                {
-                    <div class="small text-info mt-2">Uploading model file...</div>
-                }
-                else if (!string.IsNullOrWhiteSpace(_modelUploadMessage))
-                {
-                    <div class="small mt-2 @(_modelUploadIsError ? "text-danger" : "text-success")">
-                        @_modelUploadMessage
-                    </div>
-                }
-
-                <div class="mt-2">
-                    @if (_modelDeleteConfirming)
-                    {
-                        <span class="small text-warning me-2">Delete <code>bayesian_model.pkl</code>? This cannot be undone.</span>
-                        <button class="btn btn-danger btn-sm me-1"
-                                @onclick="OnModelDeleteConfirmed"
-                                disabled="@_modelDeleteInProgress">
-                            Yes, delete
-                        </button>
-                        <button class="btn btn-outline-secondary btn-sm"
-                                @onclick="() => _modelDeleteConfirming = false"
-                                disabled="@_modelDeleteInProgress">
-                            Cancel
-                        </button>
-                    }
-                    else
-                    {
-                        <button class="btn btn-outline-danger btn-sm"
-                                @onclick="() => { _modelDeleteConfirming = true; _modelDeleteMessage = null; }"
-                                disabled="@_modelUploadInProgress">
-                            🗑 Delete model file
-                        </button>
-                    }
-                    @if (_modelDeleteInProgress)
-                    {
-                        <div class="small text-info mt-1">Deleting...</div>
-                    }
-                    else if (!string.IsNullOrWhiteSpace(_modelDeleteMessage))
-                    {
-                        <div class="small mt-1 @(_modelDeleteIsError ? "text-danger" : "text-success")">
-                            @_modelDeleteMessage
-                        </div>
-                    }
-                </div>
-            </div>
-
-            <div class="mt-3 pt-3 border-top border-secondary-subtle">
-                <h6 class="mb-2">📊 Replace CSV file</h6>
-                <p class="small text-muted mb-2">
-                    Upload a new <code>.csv</code> file to replace <code>elonmusk_tweet_history.csv</code>.
-                    The predictor will hot-reload model and CSV automatically.
-                </p>
-                <InputFile OnChange="OnCsvFileSelected"
-                           accept=".csv"
-                           class="form-control form-control-sm"
-                           disabled="@_csvUploadInProgress" />
-
-                @if (_csvUploadInProgress)
-                {
-                    <div class="small text-info mt-2">Uploading CSV file...</div>
-                }
-                else if (!string.IsNullOrWhiteSpace(_csvUploadMessage))
-                {
-                    <div class="small mt-2 @(_csvUploadIsError ? "text-danger" : "text-success")">
-                        @_csvUploadMessage
-                    </div>
-                }
-            </div>
-
-            <div class="mt-3 pt-3 border-top border-secondary-subtle">
-                <h6 class="mb-2">🔁 Restart predictor</h6>
-                <p class="small text-muted mb-2">
-                    Sends a restart command to the Python predictor container via the Docker API.
-                </p>
-                @if (_restartConfirming)
-                {
-                    <span class="small text-warning me-2">Restart the predictor container? It will be briefly unavailable.</span>
-                    <button class="btn btn-danger btn-sm me-1"
-                            @onclick="OnRestartConfirmed"
-                            disabled="@_restartInProgress">
-                        Yes, restart
-                    </button>
-                    <button class="btn btn-outline-secondary btn-sm"
-                            @onclick="() => _restartConfirming = false"
-                            disabled="@_restartInProgress">
-                        Cancel
-                    </button>
-                }
-                else
-                {
-                    <button class="btn btn-outline-warning btn-sm"
-                            @onclick="() => { _restartConfirming = true; _restartMessage = null; }">
-                        🔁 Restart predictor
-                    </button>
-                }
-                @if (_restartInProgress)
-                {
-                    <div class="small text-info mt-2">Sending restart command...</div>
-                }
-                else if (!string.IsNullOrWhiteSpace(_restartMessage))
-                {
-                    <div class="small mt-2 @(_restartIsError ? "text-danger" : "text-success")">
-                        @_restartMessage
-                    </div>
-                }
-            </div>
-        </div>
-    </div>
-}
 
 <div class="card bg-dark border-secondary mb-4">
     <div class="card-body">
@@ -289,21 +116,6 @@ else
 </div>
 
 @code {
-    private PredictorStatus? _status;
-    private bool _modelUploadInProgress;
-    private string? _modelUploadMessage;
-    private bool _modelUploadIsError;
-    private bool _modelDeleteConfirming;
-    private bool _modelDeleteInProgress;
-    private string? _modelDeleteMessage;
-    private bool _modelDeleteIsError;
-    private bool _csvUploadInProgress;
-    private string? _csvUploadMessage;
-    private bool _csvUploadIsError;
-    private bool _restartConfirming;
-    private bool _restartInProgress;
-    private string? _restartMessage;
-    private bool _restartIsError;
     private IReadOnlyList<VolumeFileInfo> _volumeFiles = [];
     private string? _confirmDeleteFile;
     private bool _fileDeleteInProgress;
@@ -314,149 +126,19 @@ else
     private string? _fileUploadMessage;
     private bool _fileUploadIsError;
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        await RefreshStatusAsync();
         RefreshVolumeFiles();
         DataChangeNotifier.DataChanged += HandleDataChangedAsync;
     }
 
     private async Task HandleDataChangedAsync()
     {
-        await InvokeAsync(async () =>
+        await InvokeAsync(() =>
         {
-            await RefreshStatusAsync();
             RefreshVolumeFiles();
             StateHasChanged();
         });
-    }
-
-    private async Task RefreshStatusAsync()
-    {
-        _status = await StatusService.GetStatusAsync();
-    }
-
-    private async Task OnModelFileSelected(InputFileChangeEventArgs e)
-    {
-        var file = e.File;
-        if (file is null)
-        {
-            return;
-        }
-
-        _modelUploadInProgress = true;
-        _modelUploadMessage = null;
-        _modelUploadIsError = false;
-
-        try
-        {
-            await using var stream = file.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024);
-            var result = await ModelFileService.ReplaceModelAsync(stream, file.Name);
-            _modelUploadIsError = !result.Success;
-            _modelUploadMessage = result.Message;
-
-            if (result.Success)
-            {
-                await RefreshStatusAsync();
-            }
-        }
-        catch (Exception ex)
-        {
-            _modelUploadIsError = true;
-            _modelUploadMessage = $"Upload failed: {ex.Message}";
-        }
-        finally
-        {
-            _modelUploadInProgress = false;
-            await InvokeAsync(StateHasChanged);
-        }
-    }
-
-    private async Task OnModelDeleteConfirmed()
-    {
-        _modelDeleteInProgress = true;
-        _modelDeleteConfirming = false;
-        _modelDeleteMessage = null;
-        _modelDeleteIsError = false;
-        StateHasChanged();
-
-        try
-        {
-            var result = await ModelFileService.DeleteModelAsync();
-            _modelDeleteIsError = !result.Success;
-            _modelDeleteMessage = result.Message;
-
-            if (result.Success)
-                await RefreshStatusAsync();
-        }
-        catch (Exception ex)
-        {
-            _modelDeleteIsError = true;
-            _modelDeleteMessage = $"Delete failed: {ex.Message}";
-        }
-        finally
-        {
-            _modelDeleteInProgress = false;
-            StateHasChanged();
-        }
-    }
-
-    private async Task OnCsvFileSelected(InputFileChangeEventArgs e)
-    {
-        var file = e.File;
-        if (file is null)
-            return;
-
-        _csvUploadInProgress = true;
-        _csvUploadMessage = null;
-        _csvUploadIsError = false;
-
-        try
-        {
-            await using var stream = file.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024);
-            var result = await ModelFileService.ReplaceCsvAsync(stream, file.Name);
-            _csvUploadIsError = !result.Success;
-            _csvUploadMessage = result.Message;
-
-            if (result.Success)
-                await RefreshStatusAsync();
-        }
-        catch (Exception ex)
-        {
-            _csvUploadIsError = true;
-            _csvUploadMessage = $"Upload failed: {ex.Message}";
-        }
-        finally
-        {
-            _csvUploadInProgress = false;
-            await InvokeAsync(StateHasChanged);
-        }
-    }
-
-    private async Task OnRestartConfirmed()
-    {
-        _restartInProgress = true;
-        _restartConfirming = false;
-        _restartMessage = null;
-        _restartIsError = false;
-        StateHasChanged();
-
-        try
-        {
-            var result = await ContainerRestartService.RestartPredictorAsync();
-            _restartIsError = !result.Success;
-            _restartMessage = result.Message;
-        }
-        catch (Exception ex)
-        {
-            _restartIsError = true;
-            _restartMessage = $"Failed: {ex.Message}";
-        }
-        finally
-        {
-            _restartInProgress = false;
-            StateHasChanged();
-        }
     }
 
     private void RefreshVolumeFiles()
@@ -513,9 +195,9 @@ else
 
     private static string FormatFileSize(long bytes) => bytes switch
     {
-        < 1024           => $"{bytes} B",
-        < 1024 * 1024    => $"{bytes / 1024.0:F1} KB",
-        _                => $"{bytes / (1024.0 * 1024):F1} MB"
+        < 1024        => $"{bytes} B",
+        < 1024 * 1024 => $"{bytes / 1024.0:F1} KB",
+        _             => $"{bytes / (1024.0 * 1024):F1} MB"
     };
 
     public void Dispose()

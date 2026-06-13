@@ -21,7 +21,10 @@ public class VolumeFileService : IVolumeFileService
     private static readonly HashSet<string> ExcludedExact = new(StringComparer.OrdinalIgnoreCase)
     {
         "simple-trades.log",
-        "memory.json"
+        "memory.json",
+        "scoreboard.log",
+        "reload.flag",
+        "trades-state.json"
     };
 
     private static readonly string[] ExcludedPrefixes =
