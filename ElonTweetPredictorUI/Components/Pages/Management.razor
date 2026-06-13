@@ -212,6 +212,12 @@ else
                                     <a class="btn btn-outline-info btn-sm me-1"
                                        href="/file-manager/download/@Uri.EscapeDataString(file.FileName)"
                                        download="@file.FileName">⬇</a>
+                                    @if (file.FileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <button class="btn @(_uploadTargetFile == file.FileName ? "btn-warning" : "btn-outline-warning") btn-sm me-1"
+                                                @onclick="() => { _uploadTargetFile = _uploadTargetFile == file.FileName ? null : file.FileName; _fileUploadMessage = null; }"
+                                                disabled="@_fileUploadInProgress">📤</button>
+                                    }
                                     @if (_confirmDeleteFile == file.FileName)
                                     {
                                         <span class="small text-warning me-1">Delete?</span>
@@ -229,6 +235,31 @@ else
                                     }
                                 </td>
                             </tr>
+                            @if (_uploadTargetFile == file.FileName)
+                            {
+                                <tr>
+                                    <td colspan="4" class="pt-1 pb-2">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="small text-muted text-nowrap">Replace with:</span>
+                                            <InputFile OnChange="e => OnVolumeFileUploadSelected(e, file.FileName)"
+                                                       accept=".csv"
+                                                       class="form-control form-control-sm"
+                                                       disabled="@_fileUploadInProgress" />
+                                            <button class="btn btn-outline-secondary btn-sm"
+                                                    @onclick="() => { _uploadTargetFile = null; _fileUploadMessage = null; }"
+                                                    disabled="@_fileUploadInProgress">✕</button>
+                                        </div>
+                                        @if (_fileUploadInProgress)
+                                        {
+                                            <div class="small text-info mt-1">Uploading...</div>
+                                        }
+                                        else if (!string.IsNullOrWhiteSpace(_fileUploadMessage))
+                                        {
+                                            <div class="small mt-1 @(_fileUploadIsError ? "text-danger" : "text-success")">@_fileUploadMessage</div>
+                                        }
+                                    </td>
+                                </tr>
+                            }
                         }
                     </tbody>
                 </table>
@@ -266,6 +297,10 @@ else
     private bool _fileDeleteInProgress;
     private string? _fileDeleteMessage;
     private bool _fileDeleteIsError;
+    private string? _uploadTargetFile;
+    private bool _fileUploadInProgress;
+    private string? _fileUploadMessage;
+    private bool _fileUploadIsError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -431,6 +466,37 @@ else
             RefreshVolumeFiles();
 
         _fileDeleteInProgress = false;
+    }
+
+    private async Task OnVolumeFileUploadSelected(InputFileChangeEventArgs e, string targetFileName)
+    {
+        var file = e.File;
+        if (file is null) return;
+
+        _fileUploadInProgress = true;
+        _fileUploadMessage = null;
+        _fileUploadIsError = false;
+        StateHasChanged();
+
+        try
+        {
+            await using var stream = file.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024);
+            var result = await VolumeFileService.ReplaceFileAsync(targetFileName, stream, file.Name);
+            _fileUploadIsError = !result.Success;
+            _fileUploadMessage = result.Message;
+            if (result.Success)
+                RefreshVolumeFiles();
+        }
+        catch (Exception ex)
+        {
+            _fileUploadIsError = true;
+            _fileUploadMessage = $"Upload failed: {ex.Message}";
+        }
+        finally
+        {
+            _fileUploadInProgress = false;
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     private static string FormatFileSize(long bytes) => bytes switch

@@ -7,6 +7,11 @@ public interface IVolumeFileService
     IReadOnlyList<VolumeFileInfo> ListFiles();
     (bool Success, string Message) DeleteFile(string fileName);
     string? ResolveDownloadPath(string fileName);
+    Task<(bool Success, string Message)> ReplaceFileAsync(
+        string fileName,
+        Stream stream,
+        string uploadedFileName,
+        CancellationToken ct = default);
 }
 
 public class VolumeFileService : IVolumeFileService
@@ -90,4 +95,40 @@ public class VolumeFileService : IVolumeFileService
     private static bool IsExcluded(string fileName) =>
         ExcludedExact.Contains(fileName)
         || ExcludedPrefixes.Any(p => fileName.StartsWith(p, StringComparison.OrdinalIgnoreCase));
+
+    public async Task<(bool Success, string Message)> ReplaceFileAsync(
+        string fileName,
+        Stream stream,
+        string uploadedFileName,
+        CancellationToken ct = default)
+    {
+        if (!IsValidFileName(fileName) || IsExcluded(fileName))
+            return (false, "File is not manageable.");
+
+        var uploadExt = Path.GetExtension(uploadedFileName);
+        var targetExt = Path.GetExtension(fileName);
+        if (!string.Equals(uploadExt, targetExt, StringComparison.OrdinalIgnoreCase))
+            return (false, $"Expected a {targetExt} file, got {uploadExt}.");
+
+        var targetPath = Path.Combine(_dataPath, fileName);
+        var tempPath   = targetPath + ".upload.tmp";
+        try
+        {
+            await using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                await stream.CopyToAsync(fs, ct);
+
+            File.Move(tempPath, targetPath, overwrite: true);
+
+            var flagPath = Path.Combine(_dataPath, "reload.flag");
+            await File.WriteAllTextAsync(flagPath, $"file replaced by ui at {DateTime.UtcNow:O}", ct);
+
+            return (true, $"'{fileName}' replaced successfully. Reload signal sent.");
+        }
+        catch (Exception ex)
+        {
+            if (File.Exists(tempPath))
+                try { File.Delete(tempPath); } catch { }
+            return (false, $"Failed to replace '{fileName}': {ex.Message}");
+        }
+    }
 }
