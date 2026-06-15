@@ -8,7 +8,7 @@ namespace ElonTweetPredictorUI.Services;
 
 /// <summary>
 /// Background service that watches <c>tweet_predictor.log</c> and converts it
-/// into <c>status.json</c> + <c>logs.json</c> for the UI services to consume.
+/// into <c>status.json</c> for the UI services to consume.
 /// </summary>
 public sealed partial class LogConverterService : BackgroundService
 {
@@ -16,7 +16,6 @@ public sealed partial class LogConverterService : BackgroundService
     private readonly string _logFilePath;
 
     private readonly string _statusJsonPath;
-    private readonly string _logsJsonPath;
     private readonly IDataChangeNotifier _notifier;
     private readonly IProbabilityHistoryService _probabilityHistory;
     private readonly ILogger<LogConverterService> _logger;
@@ -117,7 +116,6 @@ public sealed partial class LogConverterService : BackgroundService
         Directory.CreateDirectory(cachePath);
         _logFilePath = Path.Combine(_dataPath, "tweet_predictor.log");
         _statusJsonPath = Path.Combine(cachePath, "status.json");
-        _logsJsonPath = Path.Combine(cachePath, "logs.json");
         _notifier = notifier;
         _probabilityHistory = probabilityHistory;
         _logger = logger;
@@ -205,22 +203,14 @@ public sealed partial class LogConverterService : BackgroundService
                     historicalSnapshots[^1].Timestamp.ToString("HH:mm:ss"));
             }
 
-            await WriteAtomicAsync(_logsJsonPath, () =>
-            {
-                var sb = new StringBuilder();
-                foreach (var entry in logEntries)
-                    sb.AppendLine(JsonSerializer.Serialize(entry));
-                return sb.ToString();
-            });
-
             await WriteAtomicAsync(_statusJsonPath, () =>
                 JsonSerializer.Serialize(status, s_statusJsonOptions));
 
             _notifier.NotifyChanged();
 
             _logger.LogDebug(
-                "Converted tweet_predictor.log → status.json + logs.json ({Lines} lines, {Entries} entries)",
-                lines.Length, logEntries.Count);
+                "Converted tweet_predictor.log → status.json ({Lines} lines)",
+                lines.Length);
         }
         catch (IOException ex)
         {
