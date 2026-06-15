@@ -13,8 +13,7 @@ public class PredictorStatus
     [JsonPropertyName("model")]                  public ModelInfo       Model                { get; set; } = new();
     [JsonPropertyName("files")]                  public FilesInfo       Files                { get; set; } = new();
     [JsonPropertyName("temporal_patterns")]       public TemporalPatterns TemporalPatterns    { get; set; } = new();
-    [JsonPropertyName("bet_interval_forecasts")]        public List<BetIntervalForecast> BetIntervalForecasts        { get; set; } = [];
-    [JsonPropertyName("hawkes_bet_interval_forecasts")] public List<BetIntervalForecast> HawkesBetIntervalForecasts { get; set; } = [];
+    [JsonPropertyName("bet_interval_forecasts")] public List<BetIntervalForecast> BetIntervalForecasts { get; set; } = [];
 }
 
 public class PredictionInfo

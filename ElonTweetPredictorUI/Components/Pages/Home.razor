@@ -98,54 +98,6 @@ else
         </div>
     }
 
-    @if (_status.HawkesBetIntervalForecasts.Count > 0)
-    {
-        <div class="card bg-dark border-secondary mb-4">
-            <div class="card-body">
-                <h6 class="card-title mb-3">📊 Bet Interval Forecasts Hawkes (New Model)</h6>
-                <div class="row g-3">
-                    @foreach (var bet in _status.HawkesBetIntervalForecasts)
-                    {
-                        <div class="col-lg-6">
-                            <div class="tracking-card">
-                                <div class="tracking-header">
-                                    <div class="fw-semibold small">@bet.Title</div>
-                                    <div class="d-flex gap-3 mt-1 small text-muted">
-                                        <span>⏳ @bet.TimeRemaining</span>
-                                        <span>✅ @bet.TweetsInWindow tweets</span>
-                                        <span>🔮 @bet.PredictedTotal <span class="text-muted">[@bet.CiLower–@bet.CiUpper]</span> σ≈@bet.Sigma.ToString("F1")</span>
-                                    </div>
-                                </div>
-                                <div class="tracking-body p-2">
-                                    @if (bet.Intervals.Count > 0)
-                                    {
-                                        @foreach (var interval in bet.Intervals)
-                                        {
-                                            <div class="d-flex align-items-center gap-2 py-1 px-2 small @(interval.IsPredicted ? "rounded" : "")" style="@(interval.IsPredicted ? "background: rgba(88, 166, 255, 0.1);" : "")">
-                                                <span class="text-muted" style="min-width: 60px;">@interval.Label</span>
-                                                <div class="flex-grow-1">
-                                                    <div class="progress" style="height: 10px; background: var(--border-color);">
-                                                        <div class="progress-bar @(interval.IsPredicted ? "bg-info" : "bg-secondary")" style="width: @interval.Probability.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)%"></div>
-                                                    </div>
-                                                </div>
-                                                <span class="@(interval.IsPredicted ? "text-info fw-semibold" : "text-muted")" style="min-width: 50px; text-align: right;">@interval.Probability.ToString("F1")%</span>
-                                                @if (interval.IsPredicted) { <span class="text-info">◄</span> }
-                                            </div>
-                                        }
-                                    }
-                                    else
-                                    {
-                                        <div class="small text-muted fst-italic">⚠️ No defined intervals overlap with CI [@bet.CiLower – @bet.CiUpper]</div>
-                                    }
-                                </div>
-                            </div>
-                        </div>
-                    }
-                </div>
-            </div>
-        </div>
-    }
-
     <div class="card bg-dark border-secondary mb-4">
         <div class="card-body">
             <h6 class="card-title mb-3">📈 Anomaly Dashboard</h6>
