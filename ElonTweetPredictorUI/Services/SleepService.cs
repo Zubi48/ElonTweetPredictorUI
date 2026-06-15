@@ -23,13 +23,29 @@ public partial class SleepService : ISleepService
     [GeneratedRegex(@"^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2},\d+\s+\[\w+\]\s*(.*)$", RegexOptions.Compiled)]
     private static partial Regex LogPrefixRegex();
 
-    // Per-weekday block header: "  += MONDAY (5 nights) ===..."
-    [GeneratedRegex(@"\+=\s*([A-Z]+)\s*\((\d+)\s+nights?\)", RegexOptions.Compiled)]
+    // Per-weekday block header v4: "  ┌─ MONDAY (17 nights)" or legacy "  += MONDAY (5 nights)"
+    [GeneratedRegex(@"(?:┌─|\+=)\s*([A-Z]+)\s*\((\d+)\s+nights?\)", RegexOptions.Compiled)]
     private static partial Regex WeekdayHeaderRegex();
 
-    // "  | Avg bedtime : 02:28 AM EST | Avg wake-up : 11:31 AM EST"
+    // "  │ Avg bedtime : 02:28 AM EST | Avg wake-up : 11:31 AM EST"  (v4 uses │, v2 used |)
     [GeneratedRegex(@"Avg bedtime\s*:\s*(\d{1,2}:\d{2}\s*[AP]M).*Avg wake-up\s*:\s*(\d{1,2}:\d{2}\s*[AP]M)", RegexOptions.Compiled)]
     private static partial Regex WeekdayAvgRegex();
+
+    // "  │ Earliest bed : 02:28 AM EST (2026-02-03) | Latest bed : 02:28 AM EST (2026-02-03)"
+    [GeneratedRegex(@"Earliest bed\s*:\s*([^|]+)\|\s*Latest bed\s*:\s*(.+)", RegexOptions.Compiled)]
+    private static partial Regex EarliestLatestBedRegex();
+
+    // "  │ Earliest wake : 11:31 AM EST (2026-02-03) | Latest wake : 11:31 AM EST (2026-02-03)"
+    [GeneratedRegex(@"Earliest wake\s*:\s*([^|]+)\|\s*Latest wake\s*:\s*(.+)", RegexOptions.Compiled)]
+    private static partial Regex EarliestLatestWakeRegex();
+
+    // "  │ Bed session : avg=8.0 tweets P(<5)=0.0%"
+    [GeneratedRegex(@"Bed session\s*:\s*avg=([\d.]+)\s*tweets", RegexOptions.Compiled)]
+    private static partial Regex BedSessionRegex();
+
+    // "  │ Morn session : avg=16.0 tweets P(<5)=0.0%"
+    [GeneratedRegex(@"Morn session\s*:\s*avg=([\d.]+)\s*tweets", RegexOptions.Compiled)]
+    private static partial Regex MornSessionRegex();
 
     // "  | Sleep duration: avg=6.5h min=3.8h max=8.0h"
     [GeneratedRegex(@"Sleep duration:\s*avg=([\d.]+)h\s+min=([\d.]+)h\s+max=([\d.]+)h", RegexOptions.Compiled)]
@@ -61,7 +77,9 @@ public partial class SleepService : ISleepService
     [GeneratedRegex(@"\b(0?[1-5])(:(\d{2})) PM\b", RegexOptions.Compiled)]
     private static partial Regex PostMidnightPmFixRegex();
 
-    [GeneratedRegex(@"Activity \(24h, dur\.\)\s*:\s*.*tier\s+(\w+)", RegexOptions.Compiled)]
+    // v4: "Activity (dur.)      : 24 tweets in the 6h before the last tweet → tier HIGH"
+    // v2: "Activity (24h, dur.) : ... tier MID"
+    [GeneratedRegex(@"Activity[^:]*:\s*.*tier\s+(\w+)", RegexOptions.Compiled)]
     private static partial Regex ActivityTierRegex();
 
     // "P(ASLEEP - in a night-rest gap) = 76.4%   (95% band: 59.1% - 90.1%)"
@@ -72,13 +90,17 @@ public partial class SleepService : ISleepService
     [GeneratedRegex(@"P\(no more tweets until[^)]*\)\s*=\s*([\d.]+)%.*?band:\s*([\d.]+)%\s*-\s*([\d.]+)%", RegexOptions.Compiled)]
     private static partial Regex NoTweets5Regex();
 
-    [GeneratedRegex(@"^\s*Median\s*:\s*(.+)", RegexOptions.Compiled)]
+    // v4: "  Predicted next tweet : 04:08 PM EST (Mon 06/15)   [median]"
+    // v2: "  Median                : 02:18 AM EST (Sat 06/13)"
+    [GeneratedRegex(@"(?:Predicted next tweet|Median)\s*:\s*(.+?)(?:\s*\[median\])?\s*$", RegexOptions.Compiled)]
     private static partial Regex MedianRegex();
 
+    // v4: "50% interval    : ..."  v2: same label
     [GeneratedRegex(@"50% interval\s*:\s*(.+)", RegexOptions.Compiled)]
     private static partial Regex Interval50Regex();
 
-    [GeneratedRegex(@"90th percentile\s*:\s*(.+)", RegexOptions.Compiled)]
+    // v4: "90% interval    : ..."  v2: "90th percentile : ..."
+    [GeneratedRegex(@"(?:90% interval|90th percentile)\s*:\s*(.+)", RegexOptions.Compiled)]
     private static partial Regex Pct90Regex();
 
     [GeneratedRegex(@"If he tweets again before the morning\s*:\s*(.+)", RegexOptions.Compiled)]
@@ -216,6 +238,28 @@ public partial class SleepService : ISleepService
             return;
         }
 
+        var earliestBed = EarliestLatestBedRegex().Match(line);
+        if (earliestBed.Success)
+        {
+            cur.EarliestBed = earliestBed.Groups[1].Value.Trim();
+            cur.LatestBed = earliestBed.Groups[2].Value.Trim();
+            return;
+        }
+
+        var earliestWake = EarliestLatestWakeRegex().Match(line);
+        if (earliestWake.Success)
+        {
+            cur.EarliestWake = earliestWake.Groups[1].Value.Trim();
+            cur.LatestWake = earliestWake.Groups[2].Value.Trim();
+            return;
+        }
+
+        var bedSession = BedSessionRegex().Match(line);
+        if (bedSession.Success) { cur.AvgBedSessionTweets = ParseD(bedSession.Groups[1].Value); return; }
+
+        var mornSession = MornSessionRegex().Match(line);
+        if (mornSession.Success) { cur.AvgMornSessionTweets = ParseD(mornSession.Groups[1].Value); return; }
+
         var dur = SleepDurationRegex().Match(line);
         if (dur.Success)
         {
@@ -235,7 +279,7 @@ public partial class SleepService : ISleepService
         }
 
         if (string.IsNullOrEmpty(weekday)) return;
-        if (line.Contains(">=80%")) return; // column header row
+        if (line.Contains(">=80%") || line.Contains("≥80%") || line.Contains("Last tweet")) return; // column header row
 
         var row = ThresholdRowRegex().Match(line);
         if (row.Success)

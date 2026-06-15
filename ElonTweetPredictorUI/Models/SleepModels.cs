@@ -1,7 +1,7 @@
 namespace ElonTweetPredictorUI.Models;
 
 /// <summary>
-/// Per-weekday sleep summary parsed from the v2 report. Captured for both
+/// Per-weekday sleep summary parsed from the v4 report. Captured for both
 /// LAUNCH and NON-LAUNCH day groups (distinguished by <see cref="IsLaunch"/>).
 /// </summary>
 public class WeekdaySleepSummary
@@ -14,6 +14,13 @@ public class WeekdaySleepSummary
     public double AvgSleepHours { get; set; }
     public double MinSleepHours { get; set; }
     public double MaxSleepHours { get; set; }
+    // v4 additions
+    public string EarliestBed { get; set; } = "";   // e.g. "02:28 AM EST (2026-02-03)"
+    public string LatestBed { get; set; } = "";
+    public string EarliestWake { get; set; } = "";
+    public string LatestWake { get; set; } = "";
+    public double AvgBedSessionTweets { get; set; }
+    public double AvgMornSessionTweets { get; set; }
 }
 
 /// <summary>
@@ -30,7 +37,7 @@ public class ConfirmationThreshold
 }
 
 /// <summary>
-/// The headline "CURRENT SLEEP-STATE ESTIMATE (v2)" block - the single most
+/// The headline "CURRENT SLEEP-STATE ESTIMATE (v4)" block - the single most
 /// useful piece of the report for live decisions.
 /// </summary>
 public class CurrentSleepEstimate

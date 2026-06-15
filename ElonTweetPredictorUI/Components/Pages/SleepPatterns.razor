@@ -29,7 +29,7 @@ else
     <div class="status-bar mb-3">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
-                <span class="badge bg-secondary">SLEEP ANALYSIS v2</span>
+                <span class="badge bg-secondary">SLEEP ANALYSIS v4</span>
                 @if (_est is not null)
                 {
                     <span class="text-muted small ms-2">@_est.ClockRegime</span>
@@ -111,7 +111,7 @@ else
                 <div class="row g-2 detail-grid">
                     <div class="col-6 col-md-4"><div class="detail-item"><span class="detail-label">Median</span><span class="detail-value text-warning">@_est.NextTweetMedian</span></div></div>
                     <div class="col-6 col-md-4"><div class="detail-item"><span class="detail-label">50% interval</span><span class="detail-value">@_est.NextTweet50Interval</span></div></div>
-                    <div class="col-6 col-md-4"><div class="detail-item"><span class="detail-label">90th percentile</span><span class="detail-value">@_est.NextTweet90Pct</span></div></div>
+                    <div class="col-6 col-md-4"><div class="detail-item"><span class="detail-label">90% interval</span><span class="detail-value">@_est.NextTweet90Pct</span></div></div>
                     @if (!string.IsNullOrWhiteSpace(_est.BranchIfTweetsAgain))
                     {
                         <div class="col-6 col-md-4"><div class="detail-item"><span class="detail-label">If tweets again</span><span class="detail-value text-success">@_est.BranchIfTweetsAgain</span></div></div>
@@ -162,6 +162,8 @@ else
                                 <th>Avg Wake-Up</th>
                                 <th>Avg Sleep</th>
                                 <th>Range</th>
+                                <th class="d-none d-md-table-cell">Bed Tweets</th>
+                                <th class="d-none d-md-table-cell">Morn Tweets</th>
                                 <th>Rating</th>
                             </tr>
                         </thead>
@@ -175,6 +177,8 @@ else
                                     <td class="text-success">@w.AvgWakeUp</td>
                                     <td class="@SleepColorClass(w.AvgSleepHours)">@w.AvgSleepHours.ToString("F1") hrs</td>
                                     <td class="text-muted small">@w.MinSleepHours.ToString("F1")–@w.MaxSleepHours.ToString("F1")</td>
+                                    <td class="d-none d-md-table-cell text-muted small">@(w.AvgBedSessionTweets > 0 ? w.AvgBedSessionTweets.ToString("F1") : "—")</td>
+                                    <td class="d-none d-md-table-cell text-muted small">@(w.AvgMornSessionTweets > 0 ? w.AvgMornSessionTweets.ToString("F1") : "—")</td>
                                     <td>@SleepRatingBadge(w.AvgSleepHours)</td>
                                 </tr>
                             }
