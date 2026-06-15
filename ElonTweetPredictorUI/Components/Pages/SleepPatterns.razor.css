@@ -52,6 +52,51 @@
 .sleep-table th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: #6c757d; border-color: rgba(255,255,255,0.1) !important; }
 .sleep-table td { border-color: rgba(255,255,255,0.06) !important; vertical-align: middle; }
 
+/* ── Forecast tiles ── */
+.forecast-tile {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 0.5rem;
+    padding: 0.75rem 0.6rem;
+    height: 100%;
+}
+.forecast-tile--primary {
+    background: rgba(255, 193, 7, 0.08);
+    border-color: rgba(255, 193, 7, 0.35);
+}
+.ft-label       { font-size: 0.70rem; text-transform: uppercase; letter-spacing: 0.05em; color: #6c757d; margin-bottom: 0.2rem; }
+.ft-value       { font-size: 1.55rem; font-weight: 700; line-height: 1.1; }
+.ft-value-sm    { font-size: 0.88rem; font-weight: 500; word-break: break-word; color: #f8f9fa; }
+.ft-sub         { font-size: 0.72rem; color: #adb5bd; margin-top: 0.15rem; }
+.ft-section-label { font-size: 0.70rem; text-transform: uppercase; letter-spacing: 0.05em; color: #6c757d; }
+
+/* ── Precision pills ── */
+.precision-pill {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 2rem;
+    padding: 0.4rem 1rem;
+    min-width: 5.5rem;
+}
+.precision-pill--highlight {
+    background: rgba(13, 202, 240, 0.1);
+    border-color: rgba(13, 202, 240, 0.35);
+}
+.pp-window { font-size: 0.70rem; color: #6c757d; }
+.pp-pct    { font-size: 1.1rem; font-weight: 700; color: #f8f9fa; line-height: 1.2; }
+
+/* ── Hourly bar chart ── */
+.hourly-chart { display: flex; flex-direction: column; gap: 0.3rem; }
+.hrow         { display: flex; align-items: center; gap: 0.5rem; }
+.hrow-label   { width: 4.8rem; font-size: 0.78rem; color: #adb5bd; flex-shrink: 0; text-align: right; }
+.hrow-track   { flex: 1; background: rgba(255,255,255,0.07); border-radius: 2px; height: 10px; overflow: hidden; }
+.hbar         { height: 100%; background: rgba(13, 202, 240, 0.55); border-radius: 2px; transition: width 0.3s; }
+.hbar--peak   { background: rgba(255, 193, 7, 0.85); }
+.hrow-pct     { width: 3.2rem; font-size: 0.75rem; color: #adb5bd; }
+
 /* ── Status bar ── */
 .status-bar {
     background: rgba(255,255,255,0.04);

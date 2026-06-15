@@ -112,6 +112,14 @@ public partial class SleepService : ISleepService
     [GeneratedRegex(@"Probability-weighted mean\s*:\s*(.+)", RegexOptions.Compiled)]
     private static partial Regex BranchWeightedRegex();
 
+    // "    within ± 15 min :  13.9%   (95% CI 11.9%–15.8%)"
+    [GeneratedRegex(@"within\s*±\s*(\d+)\s*min\s*:\s*([\d.]+)%", RegexOptions.Compiled)]
+    private static partial Regex WithinMinRegex();
+
+    // "    03:00 PM  45.1% ██████████████████"  — hour-by-hour row
+    [GeneratedRegex(@"^\s*(\d{1,2}:\d{2}\s*[AP]M)\s+([\d.]+)%", RegexOptions.Compiled)]
+    private static partial Regex HourlyProbRowRegex();
+
     public async Task<SleepData?> GetSleepDataAsync()
     {
         if (!File.Exists(_filePath))
@@ -320,6 +328,24 @@ public partial class SleepService : ISleepService
         if (TryMatch(BranchTweetsRegex(), line, out v))       { e.BranchIfTweetsAgain = v; return true; }
         if (TryMatch(BranchSilentRegex(), line, out v))       { e.BranchIfSilentTillMorning = v; return true; }
         if (TryMatch(BranchWeightedRegex(), line, out v))     { e.BranchWeightedMean = v; return true; }
+
+        var within = WithinMinRegex().Match(line);
+        if (within.Success)
+        {
+            var mins = int.Parse(within.Groups[1].Value);
+            var pct  = ParseD(within.Groups[2].Value);
+            if (mins == 15) e.Within15MinPct = pct;
+            else if (mins == 30) e.Within30MinPct = pct;
+            else if (mins == 60) e.Within60MinPct = pct;
+            return true;
+        }
+
+        var hourly = HourlyProbRowRegex().Match(line);
+        if (hourly.Success)
+        {
+            e.HourlyProbabilities.Add((hourly.Groups[1].Value.Trim(), ParseD(hourly.Groups[2].Value)));
+            return true;
+        }
 
         var asleep = AsleepRegex().Match(line);
         if (asleep.Success)

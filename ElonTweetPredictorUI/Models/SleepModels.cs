@@ -64,6 +64,14 @@ public class CurrentSleepEstimate
     public string BranchIfSilentTillMorning { get; set; } = "";
     public string BranchWeightedMean { get; set; } = "";
 
+    // Precision probabilities: P(next tweet within ±N min of median)
+    public double Within15MinPct { get; set; }
+    public double Within30MinPct { get; set; }
+    public double Within60MinPct { get; set; }
+
+    // Hour-by-hour next-tweet probability distribution
+    public List<(string Hour, double Pct)> HourlyProbabilities { get; set; } = [];
+
     public double AwakeProbability => Math.Round(100.0 - AsleepProbability, 1);
 
     /// <summary>UTC time the Python script ran the analysis (parsed from NowEst).</summary>
