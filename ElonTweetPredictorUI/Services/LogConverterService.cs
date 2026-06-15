@@ -221,9 +221,10 @@ public sealed partial class LogConverterService : BackgroundService
                         var improvedEntries = ParseLogEntries(improvedLines);
                         if (improvedEntries.Count > MaxLogEntries)
                             improvedEntries = improvedEntries[^MaxLogEntries..];
-                        var (hawkesBets, _) = ExtractAllBetData(improvedEntries);
+                        var (hawkesBets, hawkesSnapshots) = ExtractAllBetData(improvedEntries);
                         if (hawkesBets.Count > 0)
                             status.HawkesBetIntervalForecasts = hawkesBets;
+                        _probabilityHistory.SeedHawkesFromLog(hawkesSnapshots);
                     }
                 }
                 catch (IOException ex)
