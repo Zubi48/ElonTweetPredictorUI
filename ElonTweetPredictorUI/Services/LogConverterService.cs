@@ -14,6 +14,7 @@ public sealed partial class LogConverterService : BackgroundService
 {
     private readonly string _dataPath;
     private readonly string _logFilePath;
+    private readonly string _improvedLogFilePath;
 
     private readonly string _statusJsonPath;
     private readonly IDataChangeNotifier _notifier;
@@ -115,6 +116,7 @@ public sealed partial class LogConverterService : BackgroundService
             ?? Path.Combine(Path.GetTempPath(), "predictor-cache");
         Directory.CreateDirectory(cachePath);
         _logFilePath = Path.Combine(_dataPath, "tweet_predictor.log");
+        _improvedLogFilePath = Path.Combine(_dataPath, "tweet_predictor_improved.log");
         _statusJsonPath = Path.Combine(cachePath, "status.json");
         _notifier = notifier;
         _probabilityHistory = probabilityHistory;
@@ -150,6 +152,15 @@ public sealed partial class LogConverterService : BackgroundService
 
         watcher.Changed += ScheduleConversion;
         watcher.Created += ScheduleConversion;
+
+        using var improvedWatcher = new FileSystemWatcher(_dataPath)
+        {
+            Filter = "tweet_predictor_improved.log",
+            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.CreationTime,
+            EnableRaisingEvents = true
+        };
+        improvedWatcher.Changed += ScheduleConversion;
+        improvedWatcher.Created += ScheduleConversion;
 
         try
         {
@@ -193,6 +204,33 @@ public sealed partial class LogConverterService : BackgroundService
                 status.BetIntervalForecasts = currentBets;
 
             _probabilityHistory.SeedFromLog(historicalSnapshots);
+
+            // Parse tweet_predictor_improved.log for the Hawkes bet-interval forecasts
+            if (File.Exists(_improvedLogFilePath))
+            {
+                try
+                {
+                    string improvedContent;
+                    using (var s2 = new FileStream(_improvedLogFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                    using (var r2 = new StreamReader(s2, Encoding.UTF8))
+                        improvedContent = await r2.ReadToEndAsync();
+
+                    var improvedLines = improvedContent.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                    if (improvedLines.Length > 0)
+                    {
+                        var improvedEntries = ParseLogEntries(improvedLines);
+                        if (improvedEntries.Count > MaxLogEntries)
+                            improvedEntries = improvedEntries[^MaxLogEntries..];
+                        var (hawkesBets, _) = ExtractAllBetData(improvedEntries);
+                        if (hawkesBets.Count > 0)
+                            status.HawkesBetIntervalForecasts = hawkesBets;
+                    }
+                }
+                catch (IOException ex)
+                {
+                    _logger.LogWarning(ex, "Could not read tweet_predictor_improved.log — skipping Hawkes bets.");
+                }
+            }
 
             if (historicalSnapshots.Count > 0)
             {
