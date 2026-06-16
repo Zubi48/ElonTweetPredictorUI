@@ -25,7 +25,10 @@ services:
       - traefik.http.routers.elon.rule=Host(`elon.incuzentric.com`)
       - traefik.http.routers.elon.entrypoints=websecure
       - traefik.http.routers.elon.tls.certresolver=le
+      - traefik.http.routers.elon.middlewares=auth-elon
       - traefik.http.services.elon.loadbalancer.server.port=8080
+      - 'traefik.http.middlewares.auth-elon.basicauth.users=elon:$$apr1$$zIBPKlAM$$wtLimAEoRjMo.V8ifZQli0'
+      - "com.centurylinklabs.watchtower.enable=true"
 
 networks:
   proxy:
