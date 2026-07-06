@@ -72,9 +72,13 @@ public sealed partial class TradingLogService : ITradingLogService
     [GeneratedRegex(@"│\s+Edge:\s+([+-]?[\d.]+\s*%)\s*\|\s*Reason:\s*(.+)")]
     private static partial Regex TradeSellEdgeRegex();
 
-    // SYNC: Exit: UNKNOWN (external) or Exit: $0.05
+    // SYNC: Exit: UNKNOWN (external) or Exit: $0.05 or Exit: $0.2800  (28.00 %)
     [GeneratedRegex(@"│\s+Exit:\s+(.+)")]
     private static partial Regex TradeExitRegex();
+
+    // Leading price inside the Exit value, e.g. "$0.2800  (28.00 %)" -> 0.2800
+    [GeneratedRegex(@"^\$?([\d.]+)")]
+    private static partial Regex ExitPriceRegex();
 
     // SYNC/SELL: standalone Reason: line
     [GeneratedRegex(@"│\s+Reason:\s+(.+)")]
@@ -277,8 +281,8 @@ public sealed partial class TradingLogService : ITradingLogService
         {
             var exitStr = m.Groups[1].Value.Trim();
             trade.ExitInfo = exitStr;
-            var numericStr = exitStr.TrimStart('$');
-            if (decimal.TryParse(numericStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var exitPrice))
+            var priceMatch = ExitPriceRegex().Match(exitStr);
+            if (priceMatch.Success && decimal.TryParse(priceMatch.Groups[1].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var exitPrice))
                 trade.CurrentPrice = exitPrice;
             return;
         }
