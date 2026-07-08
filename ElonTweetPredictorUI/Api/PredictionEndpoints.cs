@@ -33,6 +33,14 @@ public static class PredictionEndpoints
             return Results.Ok(status.BetIntervalForecasts);
         });
 
+        // Slim endpoint: only the new Hawkes model interval forecasts
+        api.MapGet("/hawkes-bet-interval-forecasts", async Task<IResult> (IStatusService statusService) =>
+        {
+            var status = await statusService.GetStatusAsync();
+            if (status is null) return Results.NotFound();
+            return Results.Ok(status.HawkesBetIntervalForecasts);
+        });
+
         // Bot-focused context: sleep + tweet-activity signals only (no heavy prediction data)
         api.MapGet("/bot-context", async Task<IResult> (
             ISleepService sleepService,
