@@ -11,7 +11,7 @@ public interface IProbabilityHistoryService
     void SeedFromLog(List<HistoricalBetSnapshot> snapshots);
 
     /// <summary>
-    /// Replace Hawkes history with timestamped snapshots from tweet_predictor_improved.log.
+    /// Replace Hawkes history with timestamped snapshots from tweet_predictor_v7.log.
     /// Stored under a separate namespace so it never collides with main-log data.
     /// </summary>
     void SeedHawkesFromLog(List<HistoricalBetSnapshot> snapshots);

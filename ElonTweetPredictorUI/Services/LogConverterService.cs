@@ -116,7 +116,7 @@ public sealed partial class LogConverterService : BackgroundService
             ?? Path.Combine(Path.GetTempPath(), "predictor-cache");
         Directory.CreateDirectory(cachePath);
         _logFilePath = Path.Combine(_dataPath, "tweet_predictor.log");
-        _improvedLogFilePath = Path.Combine(_dataPath, "tweet_predictor_improved.log");
+        _improvedLogFilePath = Path.Combine(_dataPath, "tweetpredictorv7", "tweet_predictor_v7.log");
         _statusJsonPath = Path.Combine(cachePath, "status.json");
         _notifier = notifier;
         _probabilityHistory = probabilityHistory;
@@ -153,9 +153,12 @@ public sealed partial class LogConverterService : BackgroundService
         watcher.Changed += ScheduleConversion;
         watcher.Created += ScheduleConversion;
 
+        // The improved (Hawkes v7) log now lives in a sub-directory of the data
+        // volume, so watch the whole tree and filter on the file name.
         using var improvedWatcher = new FileSystemWatcher(_dataPath)
         {
-            Filter = "tweet_predictor_improved.log",
+            Filter = "tweet_predictor_v7.log",
+            IncludeSubdirectories = true,
             NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.CreationTime,
             EnableRaisingEvents = true
         };
@@ -205,7 +208,7 @@ public sealed partial class LogConverterService : BackgroundService
 
             _probabilityHistory.SeedFromLog(historicalSnapshots);
 
-            // Parse tweet_predictor_improved.log for the Hawkes bet-interval forecasts
+            // Parse tweet_predictor_v7.log for the Hawkes bet-interval forecasts
             if (File.Exists(_improvedLogFilePath))
             {
                 try
@@ -229,7 +232,7 @@ public sealed partial class LogConverterService : BackgroundService
                 }
                 catch (IOException ex)
                 {
-                    _logger.LogWarning(ex, "Could not read tweet_predictor_improved.log — skipping Hawkes bets.");
+                    _logger.LogWarning(ex, "Could not read tweet_predictor_v7.log — skipping Hawkes bets.");
                 }
             }
 
