@@ -43,6 +43,23 @@ public static class TradingPayload
                 i.IsPredicted
             })
         }),
+        // New Hawkes model forecasts — added alongside (not replacing) the legacy Forecasts above.
+        HawkesForecasts = status.HawkesBetIntervalForecasts.Select(f => new
+        {
+            f.Title,
+            f.TimeRemaining,
+            f.TweetsInWindow,
+            f.PredictedTotal,
+            f.CiLower,
+            f.CiUpper,
+            f.Sigma,
+            Intervals = f.Intervals.Select(i => new
+            {
+                i.Label,
+                i.Probability,
+                i.IsPredicted
+            })
+        }),
         SleepContext  = BuildSleepContext(sleepData),
         TweetActivity = BuildTweetActivity(heatmap),
     };
