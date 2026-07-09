@@ -191,11 +191,16 @@ public sealed partial class LogConverterService : BackgroundService
 
         try
         {
-            if (!File.Exists(_logFilePath))
+            // The legacy v4 producer wrote tweet_predictor.log; the current v7
+            // model writes only tweetpredictorv7/tweet_predictor_v7.log. Fall back
+            // to the v7 log as the primary status source when the v4 log is absent
+            // so the dashboard still populates once v4 is retired.
+            var primaryLogPath = File.Exists(_logFilePath) ? _logFilePath : _improvedLogFilePath;
+            if (!File.Exists(primaryLogPath))
                 return;
 
             string content;
-            using (var stream = new FileStream(_logFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (var stream = new FileStream(primaryLogPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             using (var reader = new StreamReader(stream, Encoding.UTF8))
             {
                 content = await reader.ReadToEndAsync();
