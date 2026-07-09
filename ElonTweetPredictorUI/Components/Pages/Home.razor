@@ -68,6 +68,7 @@ else
                                         <span>✅ @bet.TweetsInWindow tweets</span>
                                         <span>🔮 @bet.PredictedTotal <span class="text-muted">[@bet.CiLower–@bet.CiUpper]</span> σ≈@bet.Sigma.ToString("F1")</span>
                                     </div>
+                                    @RenderRiskStrip(bet)
                                 </div>
                                 <div class="tracking-body p-2">
                                     @foreach (var interval in bet.Intervals)
@@ -115,6 +116,7 @@ else
                                         <span>✅ @bet.TweetsInWindow tweets</span>
                                         <span>🔮 @bet.PredictedTotal <span class="text-muted">[@bet.CiLower–@bet.CiUpper]</span> σ≈@bet.Sigma.ToString("F1")</span>
                                     </div>
+                                    @RenderRiskStrip(bet)
                                 </div>
                                 <div class="tracking-body p-2">
                                     @if (bet.Intervals.Count > 0)
@@ -189,6 +191,73 @@ else
     {
         _status = await StatusService.GetStatusAsync();
         _initialLoadCompleted = true;
+    }
+
+    private RenderFragment RenderRiskStrip(BetIntervalForecast bet) => __builder =>
+    {
+        if (bet.Stability is null && bet.RegimeContext is null && bet.WindowRisk is null)
+        {
+            return;
+        }
+
+        <div class="d-flex align-items-center gap-3 mt-2 small flex-wrap">
+            @if (bet.Stability is { } st)
+            {
+                <span class="badge @TierBadgeCss(st.Tier)" style="font-size: 0.65rem;" title="@st.Signal">
+                    @TierLabel(st.Tier) · @st.Score/100
+                </span>
+            }
+            @if (bet.RegimeContext is { } rc)
+            {
+                <span class="text-muted" title="@RegimeTooltip(rc)">
+                    🔁 Regime holds to close:
+                    <strong class="@HoldCss(rc.PHoldPct)">@rc.PHoldPct.ToString("F0")%</strong>
+                    <span class="text-muted">[@rc.PHoldCiLowPct.ToString("F0")–@rc.PHoldCiHighPct.ToString("F0")]</span>
+                </span>
+            }
+            @if (bet.WindowRisk is { } wr)
+            {
+                <span class="text-muted" title="Historically, in @wr.SampleSize similar windows (@wr.WindowType), the realised tweet rate ended >20% / >30% / >50% away from the level seen now in @wr.PDeviationGt20Pct.ToString("F0")% / @wr.PDeviationGt30Pct.ToString("F0")% / @wr.PDeviationGt50Pct.ToString("F0")% of cases.">
+                    ⚡ Rate-shift risk (&gt;30%):
+                    <strong class="@RiskCss(wr.PDeviationGt30Pct)">@wr.PDeviationGt30Pct.ToString("F0")%</strong>
+                    <span class="text-muted">(n=@wr.SampleSize)</span>
+                </span>
+            }
+        </div>
+    };
+
+    private static string TierBadgeCss(string tier) => tier switch
+    {
+        "HIGH"   => "bg-success",
+        "MEDIUM" => "bg-warning text-dark",
+        _        => "bg-danger"
+    };
+
+    private static string TierLabel(string tier) => tier switch
+    {
+        "HIGH"   => "✔ STABLE",
+        "MEDIUM" => "⚠ WATCH",
+        _        => "✖ UNSTABLE"
+    };
+
+    private static string HoldCss(double pct) =>
+        pct >= 85 ? "text-success" : pct >= 70 ? "text-warning" : "text-danger";
+
+    private static string RiskCss(double pct) =>
+        pct <= 20 ? "text-success" : pct <= 40 ? "text-warning" : "text-danger";
+
+    private static string RegimeTooltip(RegimeContextInfo rc)
+    {
+        var details = new List<string>();
+        if (rc.CurrentRatePerDay is { } rate) details.Add($"current level ~{rate:F0}/day");
+        if (rc.RegimeAgeDays is { } age) details.Add($"regime age {age:F0}d");
+        if (rc.ExpectedDurationDays is { } exp) details.Add($"expected duration ~{exp:F0}d");
+        if (rc.PrecursorFactor is { } pf) details.Add($"precursor ×{pf:F2} next {rc.PrecursorHorizonDays ?? 7:F0}d");
+
+        var text = $"P(current tweet-level regime survives the next {rc.HorizonDays:F1}d until this bet closes).";
+        if (details.Count > 0)
+            text += " " + string.Join(" · ", details) + ".";
+        return text + " Switch risk is already reflected in the forecast CI.";
     }
 
     private RenderFragment RenderDelta(double? delta, string label) => builder =>

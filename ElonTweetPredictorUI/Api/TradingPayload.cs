@@ -41,7 +41,10 @@ public static class TradingPayload
                 i.Label,
                 i.Probability,
                 i.IsPredicted
-            })
+            }),
+            f.WindowRisk,
+            f.RegimeContext,
+            f.Stability
         }),
         // New Hawkes model forecasts — added alongside (not replacing) the legacy Forecasts above.
         HawkesForecasts = status.HawkesBetIntervalForecasts.Select(f => new
@@ -58,7 +61,10 @@ public static class TradingPayload
                 i.Label,
                 i.Probability,
                 i.IsPredicted
-            })
+            }),
+            f.WindowRisk,
+            f.RegimeContext,
+            f.Stability
         }),
         SleepContext  = BuildSleepContext(sleepData),
         TweetActivity = BuildTweetActivity(heatmap),

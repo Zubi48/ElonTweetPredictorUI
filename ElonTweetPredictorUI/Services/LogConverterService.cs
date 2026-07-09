@@ -105,6 +105,18 @@ public sealed partial class LogConverterService : BackgroundService
     [GeneratedRegex(@"(<?\d+(?:-\d+)?)\s+(\d+\.?\d*)%")]
     private static partial Regex IntervalRowRegex();
 
+    // ⚡ Window risk (Fri+7d type, n=26): P(realised rate deviates >20/30/50% from current level) = 38/23/4%
+    [GeneratedRegex(@"Window risk\s+\(([^,]+?)(?:\s+type)?,\s*n=(\d+)\):.*?=\s*(\d+\.?\d*)/(\d+\.?\d*)/(\d+\.?\d*)%")]
+    private static partial Regex WindowRiskRegex();
+
+    // 🔁 Regime context: P(level regime holds 8.0d) ≈ 82% [61–96]  (...)
+    [GeneratedRegex(@"Regime context:\s*P\(level regime holds\s+(\d+\.?\d*)d\)\s*[≈=]\s*(\d+\.?\d*)%\s*\[(\d+\.?\d*)\s*[–—-]\s*(\d+\.?\d*)\]")]
+    private static partial Regex RegimeContextRegex();
+
+    // Detail tail of the regime line: current ~25/day, age 7d, ~34d expected, precursor ×0.93 next 7d
+    [GeneratedRegex(@"current\s+~?(\d+\.?\d*)/day,\s*age\s+(\d+\.?\d*)d,\s*~?(\d+\.?\d*)d\s+expected(?:,\s*precursor\s+[×x](\d+\.?\d*)\s+next\s+(\d+\.?\d*)d)?")]
+    private static partial Regex RegimeDetailRegex();
+
     public LogConverterService(
         IConfiguration configuration,
         IDataChangeNotifier notifier,
@@ -744,6 +756,47 @@ public sealed partial class LogConverterService : BackgroundService
                 continue;
             }
 
+            var wrMatch = WindowRiskRegex().Match(msg);
+            if (wrMatch.Success)
+            {
+                current.WindowRisk = new WindowRiskInfo
+                {
+                    WindowType = wrMatch.Groups[1].Value.Trim(),
+                    SampleSize = int.Parse(wrMatch.Groups[2].Value),
+                    PDeviationGt20Pct = double.Parse(wrMatch.Groups[3].Value, CultureInfo.InvariantCulture),
+                    PDeviationGt30Pct = double.Parse(wrMatch.Groups[4].Value, CultureInfo.InvariantCulture),
+                    PDeviationGt50Pct = double.Parse(wrMatch.Groups[5].Value, CultureInfo.InvariantCulture)
+                };
+                continue;
+            }
+
+            var rcMatch = RegimeContextRegex().Match(msg);
+            if (rcMatch.Success)
+            {
+                var regime = new RegimeContextInfo
+                {
+                    HorizonDays = double.Parse(rcMatch.Groups[1].Value, CultureInfo.InvariantCulture),
+                    PHoldPct = double.Parse(rcMatch.Groups[2].Value, CultureInfo.InvariantCulture),
+                    PHoldCiLowPct = double.Parse(rcMatch.Groups[3].Value, CultureInfo.InvariantCulture),
+                    PHoldCiHighPct = double.Parse(rcMatch.Groups[4].Value, CultureInfo.InvariantCulture)
+                };
+
+                var detail = RegimeDetailRegex().Match(msg);
+                if (detail.Success)
+                {
+                    regime.CurrentRatePerDay = double.Parse(detail.Groups[1].Value, CultureInfo.InvariantCulture);
+                    regime.RegimeAgeDays = double.Parse(detail.Groups[2].Value, CultureInfo.InvariantCulture);
+                    regime.ExpectedDurationDays = double.Parse(detail.Groups[3].Value, CultureInfo.InvariantCulture);
+                    if (detail.Groups[4].Success)
+                        regime.PrecursorFactor = double.Parse(detail.Groups[4].Value, CultureInfo.InvariantCulture);
+                    if (detail.Groups[5].Success)
+                        regime.PrecursorHorizonDays = double.Parse(detail.Groups[5].Value, CultureInfo.InvariantCulture);
+                }
+
+                current.RegimeContext = regime;
+                continue;
+            }
+
             if (msg.Contains("───"))
             {
                 inIntervals = !inIntervals;
@@ -764,6 +817,9 @@ public sealed partial class LogConverterService : BackgroundService
                 }
             }
         }
+
+        foreach (var forecast in result)
+            forecast.Stability = ForecastStabilityInfo.Derive(forecast.WindowRisk, forecast.RegimeContext);
 
         return result;
     }
