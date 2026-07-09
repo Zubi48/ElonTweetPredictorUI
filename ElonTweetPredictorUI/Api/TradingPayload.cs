@@ -27,26 +27,7 @@ public static class TradingPayload
             status.Prediction.DaysRemaining,
             status.Prediction.Pace
         },
-        Forecasts = status.BetIntervalForecasts.Select(f => new
-        {
-            f.Title,
-            f.TimeRemaining,
-            f.TweetsInWindow,
-            f.PredictedTotal,
-            f.CiLower,
-            f.CiUpper,
-            f.Sigma,
-            Intervals = f.Intervals.Select(i => new
-            {
-                i.Label,
-                i.Probability,
-                i.IsPredicted
-            }),
-            f.WindowRisk,
-            f.RegimeContext,
-            f.Stability
-        }),
-        // New Hawkes model forecasts — added alongside (not replacing) the legacy Forecasts above.
+        // Hawkes model interval forecasts (the legacy v4 Forecasts field was removed).
         HawkesForecasts = status.HawkesBetIntervalForecasts.Select(f => new
         {
             f.Title,

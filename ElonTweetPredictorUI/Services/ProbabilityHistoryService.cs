@@ -5,18 +5,11 @@ namespace ElonTweetPredictorUI.Services;
 public interface IProbabilityHistoryService
 {
     /// <summary>
-    /// Replace all history with timestamped snapshots parsed from the log file.
-    /// Called by <see cref="LogConverterService"/> on every conversion.
-    /// </summary>
-    void SeedFromLog(List<HistoricalBetSnapshot> snapshots);
-
-    /// <summary>
     /// Replace Hawkes history with timestamped snapshots from tweet_predictor_v7.log.
-    /// Stored under a separate namespace so it never collides with main-log data.
+    /// Called by <see cref="LogConverterService"/> on every conversion.
     /// </summary>
     void SeedHawkesFromLog(List<HistoricalBetSnapshot> snapshots);
 
-    ProbabilityDeltas GetDeltas(string betTitle, string intervalLabel);
     ProbabilityDeltas GetHawkesDeltas(string betTitle, string intervalLabel);
 }
 
@@ -27,7 +20,7 @@ public sealed record HistoricalBetSnapshot(DateTime Timestamp, List<BetIntervalF
 /// Tracks probability values over time so the UI can show how much each
 /// interval probability has changed in the last 5 min, 30 min, and 1 hour.
 ///
-/// Data is seeded entirely from the <c>tweet_predictor.log</c> file by
+/// Data is seeded entirely from the <c>tweet_predictor_v7.log</c> file by
 /// <see cref="LogConverterService"/>, so it survives container restarts and
 /// is available immediately on startup.
 /// </summary>
@@ -38,9 +31,6 @@ public sealed class ProbabilityHistoryService : IProbabilityHistoryService
     // key = "betTitle||intervalLabel"  →  chronologically sorted snapshots
     private readonly Dictionary<string, List<ProbabilitySnapshot>> _history = new();
     private readonly object _lock = new();
-
-    public void SeedFromLog(List<HistoricalBetSnapshot> snapshots) =>
-        SeedInternal(snapshots, prefix: null);
 
     public void SeedHawkesFromLog(List<HistoricalBetSnapshot> snapshots) =>
         SeedInternal(snapshots, prefix: "hawkes");
@@ -88,9 +78,6 @@ public sealed class ProbabilityHistoryService : IProbabilityHistoryService
             }
         }
     }
-
-    public ProbabilityDeltas GetDeltas(string betTitle, string intervalLabel) =>
-        GetDeltasInternal(BuildKey(betTitle, intervalLabel, prefix: null));
 
     public ProbabilityDeltas GetHawkesDeltas(string betTitle, string intervalLabel) =>
         GetDeltasInternal(BuildKey(betTitle, intervalLabel, prefix: "hawkes"));

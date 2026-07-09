@@ -25,15 +25,7 @@ public static class PredictionEndpoints
             return Results.Ok(TradingPayload.Build(status, sleepTask.Result, heatmapTask.Result));
         });
 
-        // Slim endpoint: only the interval forecasts (unchanged for backward compat)
-        api.MapGet("/bet-interval-forecasts", async Task<IResult> (IStatusService statusService) =>
-        {
-            var status = await statusService.GetStatusAsync();
-            if (status is null) return Results.NotFound();
-            return Results.Ok(status.BetIntervalForecasts);
-        });
-
-        // Slim endpoint: only the new Hawkes model interval forecasts
+        // Slim endpoint: only the Hawkes model interval forecasts
         api.MapGet("/hawkes-bet-interval-forecasts", async Task<IResult> (IStatusService statusService) =>
         {
             var status = await statusService.GetStatusAsync();

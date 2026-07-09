@@ -210,20 +210,7 @@ public sealed partial class LogConverterService : BackgroundService
             if (lines.Length == 0)
                 return;
 
-            var logEntries = ParseLogEntries(lines);
-            if (logEntries.Count > MaxLogEntries)
-                logEntries = logEntries[^MaxLogEntries..];
-
             var status = BuildStatus(lines);
-
-            // Reuse the already-parsed log entries (which have clean timestamps)
-            // to extract both current bet-interval forecasts and the historical
-            // snapshots for the probability-delta badges.
-            var (currentBets, historicalSnapshots) = ExtractAllBetData(logEntries);
-            if (currentBets.Count > 0)
-                status.BetIntervalForecasts = currentBets;
-
-            _probabilityHistory.SeedFromLog(historicalSnapshots);
 
             // Parse tweet_predictor_v7.log for the Hawkes bet-interval forecasts
             if (File.Exists(_improvedLogFilePath))
@@ -251,15 +238,6 @@ public sealed partial class LogConverterService : BackgroundService
                 {
                     _logger.LogWarning(ex, "Could not read tweet_predictor_v7.log — skipping Hawkes bets.");
                 }
-            }
-
-            if (historicalSnapshots.Count > 0)
-            {
-                _logger.LogDebug(
-                    "Probability history: {Count} snapshots spanning {Oldest} → {Newest}",
-                    historicalSnapshots.Count,
-                    historicalSnapshots[0].Timestamp.ToString("HH:mm:ss"),
-                    historicalSnapshots[^1].Timestamp.ToString("HH:mm:ss"));
             }
 
             await WriteAtomicAsync(_statusJsonPath, () =>
@@ -539,7 +517,6 @@ public sealed partial class LogConverterService : BackgroundService
         }
 
         status.TemporalPatterns = ParseTemporalPatterns(lines);
-        // BetIntervalForecasts is set in ConvertAsync from the parsed log entries
 
         return status;
     }
