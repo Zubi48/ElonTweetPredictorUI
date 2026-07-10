@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C z:/repos/ElonTweetPredictorUI commit -m ' *)"
+    ]
+  }
+}

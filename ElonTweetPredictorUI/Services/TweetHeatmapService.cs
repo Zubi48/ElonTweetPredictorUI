@@ -60,9 +60,11 @@ public class TweetHeatmapService : ITweetHeatmapService
         if (header is null) return null;
 
         var headers = header.Split(',');
-        // Find column named "created_at", "timestamp", "date", "time" (case-insensitive)
+        // Find the timestamp column by header name (case-insensitive). The v7
+        // tweet-history CSV names it "DateTime_UTC".
         int tsCol = Array.FindIndex(headers, h =>
-            h.Trim('"').Trim().ToLowerInvariant() is "created_at" or "timestamp" or "date" or "time");
+            h.Trim('"').Trim().ToLowerInvariant() is
+                "created_at" or "timestamp" or "date" or "time" or "datetime" or "datetime_utc");
         if (tsCol < 0) tsCol = 0; // fallback to first column
 
         string? line;
@@ -114,14 +116,9 @@ public class TweetHeatmapService : ITweetHeatmapService
             if (File.Exists(candidate)) return candidate;
         }
 
-        // Fallback: first CSV in data directory
-        if (Directory.Exists(_dataPath))
-        {
-            return Directory.EnumerateFiles(_dataPath, "*.csv", SearchOption.TopDirectoryOnly)
-                .OrderByDescending(File.GetLastWriteTimeUtc)
-                .FirstOrDefault();
-        }
-        return null;
+        // Fallback: the known per-tweet history CSV (never an arbitrary CSV —
+        // poll logs would corrupt the hourly tweet counts).
+        return TweetHistoryCsv.Resolve(_dataPath);
     }
 
     private static bool TryParseTimestamp(string raw, out DateTime utcDt)

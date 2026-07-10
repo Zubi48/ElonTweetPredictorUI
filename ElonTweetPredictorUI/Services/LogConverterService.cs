@@ -506,12 +506,7 @@ public sealed partial class LogConverterService : BackgroundService
 
         if (string.IsNullOrEmpty(status.Files.Csv) && Directory.Exists(_dataPath))
         {
-            var namedCsv = Path.Combine(_dataPath, "elonmusk_tweet_history.csv");
-            var csvFile = File.Exists(namedCsv)
-                ? namedCsv
-                : Directory.EnumerateFiles(_dataPath, "*.csv", SearchOption.TopDirectoryOnly)
-                    .OrderByDescending(File.GetLastWriteTimeUtc)
-                    .FirstOrDefault();
+            var csvFile = TweetHistoryCsv.Resolve(_dataPath);
             if (csvFile is not null)
                 status.Files.Csv = csvFile;
         }
