@@ -21,6 +21,13 @@ public class TradeEntry
     public double KellyRawPercent { get; set; }
     public double KellyAdjPercent { get; set; }
 
+    // V2 (unified strategy) fields
+    public double? ShadedPercent { get; set; }
+    public double? BarPercent { get; set; }
+    public string ModelInfo { get; set; } = "";
+    public string RegimeInfo { get; set; } = "";
+    public string CountRiskInfo { get; set; } = "";
+
     // SELL fields
     public decimal EntryPrice { get; set; }
     public decimal CurrentPrice { get; set; }

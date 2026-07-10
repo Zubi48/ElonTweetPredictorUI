@@ -1,0 +1,76 @@
+.trade-pairs {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.trade-pair-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.trade-pair-col {
+    display: flex;
+    flex-direction: column;
+}
+
+.trade-pair-left {
+    grid-column: 1;
+}
+
+.trade-pair-right {
+    grid-column: 2;
+}
+
+/* Mobile responsiveness - stack on small screens */
+@media (max-width: 768px) {
+    .trade-pair-row {
+        grid-template-columns: 1fr;
+    }
+
+    .trade-pair-left {
+        grid-column: 1;
+    }
+
+    .trade-pair-right {
+        grid-column: 1;
+    }
+}
+
+.trade-card {
+    background: var(--bg-card-2);
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    overflow: hidden;
+}
+
+.trade-buy {
+    border-left: 3px solid var(--accent-green);
+}
+
+.trade-sell {
+    border-left: 3px solid var(--accent-red);
+}
+
+.trade-win {
+    border-left: 3px solid var(--accent-green);
+}
+
+.trade-sync {
+    border-left: 3px solid var(--accent-yellow);
+}
+
+.trade-adjustment {
+    border-left: 3px solid var(--accent-yellow);
+}
+
+.trade-header {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    background: rgba(88, 166, 255, 0.05);
+}
+
+.trade-body {
+    padding: 0.75rem 1rem;
+}

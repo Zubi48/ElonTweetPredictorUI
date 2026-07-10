@@ -27,6 +27,8 @@ builder.Services.AddSingleton<ITradingLogService, TradingLogService>();
 builder.Services.AddSingleton<ISleepService, SleepService>();
 builder.Services.AddSingleton<ITweetHeatmapService, TweetHeatmapService>();
 builder.Services.AddSingleton<ITradingChangeNotifier, TradingChangeNotifier>();
+builder.Services.AddSingleton<ITradingV2LogService, TradingV2LogService>();
+builder.Services.AddSingleton<ITradingV2ChangeNotifier, TradingV2ChangeNotifier>();
 builder.Services.AddSingleton<IVolumeFileService, VolumeFileService>();
 builder.Services.AddHostedService<LogConverterService>();
 builder.Services.AddSignalR();

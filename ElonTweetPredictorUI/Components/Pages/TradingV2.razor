@@ -1,0 +1,378 @@
+@page "/trading-v2"
+@rendermode InteractiveServer
+@implements IDisposable
+@inject ITradingV2LogService TradingV2LogService
+@inject ITradingV2ChangeNotifier TradingV2ChangeNotifier
+
+<PageTitle>Trading v2</PageTitle>
+
+@if (!_authenticated)
+{
+    <div class="d-flex justify-content-center align-items-center" style="min-height: 60vh;">
+        <div class="card bg-dark border-secondary" style="max-width: 380px; width: 100%;">
+            <div class="card-body">
+                <h6 class="card-title mb-3">🔒 Trading v2 Access</h6>
+                <EditForm Model="_loginModel" OnValidSubmit="OnPasswordSubmit" FormName="tradingV2Login">
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Password</label>
+                        <InputText type="password" class="form-control form-control-sm" @bind-Value="_loginModel.Password" />
+                    </div>
+                    @if (_loginFailed)
+                    {
+                        <div class="text-danger small mb-2">Incorrect password.</div>
+                    }
+                    <button type="submit" class="btn btn-primary btn-sm w-100">Unlock</button>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+else if (_session is null)
+{
+    if (!_initialLoadCompleted)
+    {
+        <div class="loading-container">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3 text-muted">Loading trading data...</p>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-warning" role="alert">
+            <h6 class="alert-heading mb-2">No trading data available</h6>
+            <p class="mb-0">The UI cannot find <code>unified-trades.log</code> in the v2 data volume (<code>/app/data-v2</code>). Verify the v2 trading bot is running.</p>
+        </div>
+    }
+}
+else
+{
+    <div class="status-bar">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <span class="badge bg-info">TRADING V2</span>
+                <span class="text-muted small ms-2">Latest session: @_session.StartedAt</span>
+            </div>
+            <div class="text-muted small">
+                Live updates enabled
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="metric-card text-center">
+                <div class="metric-label">Buys</div>
+                <div class="metric-value text-info">@_session.LatestSummary.Buys</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="metric-card text-center">
+                <div class="metric-label">Sells</div>
+                <div class="metric-value">@_session.LatestSummary.Sells</div>
+                <div class="metric-sublabel">
+                    <span class="text-success">W @_session.LatestSummary.Wins</span>
+                    <span class="text-muted mx-1">|</span>
+                    <span class="text-danger">L @_session.LatestSummary.Losses</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="metric-card text-center">
+                <div class="metric-label">Win Rate</div>
+                <div class="metric-value @(_session.LatestSummary.WinratePercent >= 50 ? "text-success" : "text-muted")">
+                    @_session.LatestSummary.WinratePercent.ToString("F1")%
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="metric-card text-center">
+                <div class="metric-label">Total P&amp;L</div>
+                <div class="metric-value @(_session.LatestSummary.TotalPnL >= 0 ? "text-success" : "text-danger")">
+                    @(_session.LatestSummary.TotalPnL >= 0 ? "+" : "")$@_session.LatestSummary.TotalPnL.ToString("F2")
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (_session.Trades.Count > 0)
+    {
+        <div class="card bg-dark border-secondary mb-4">
+            <div class="card-body">
+                <h6 class="card-title mb-3">📋 Trades (@_session.Trades.Count)</h6>
+                <div class="trade-pairs">
+                    @foreach (var pair in GroupTradesIntoPairs(_session.Trades))
+                    {
+                        <div class="trade-pair-row">
+                            <div class="trade-pair-col trade-pair-left">
+                                @TradeCard(pair.Buy)
+                            </div>
+                            @if (pair.Sell is not null)
+                            {
+                                <div class="trade-pair-col trade-pair-right">
+                                    @TradeCard(pair.Sell)
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private TradingSession? _session;
+    private bool _initialLoadCompleted;
+    private bool _authenticated;
+    private bool _loginFailed;
+    private readonly LoginModel _loginModel = new();
+
+    private const string AccessPassword = "zubi48";
+
+    private RenderFragment<TradeEntry> TradeCard => trade =>
+        @<div class="trade-card @CardClass(trade)">
+            <div class="trade-header">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge @TypeBadge(trade)">@trade.Type</span>
+                    <span class="badge bg-secondary">@trade.Mode</span>
+                    @if (!string.IsNullOrEmpty(trade.Outcome))
+                    {
+                        <span class="badge @(trade.IsWin ? "bg-success" : "bg-danger")">@trade.Outcome</span>
+                    }
+                    <span class="fw-semibold small">@trade.Event</span>
+                </div>
+                <div class="small text-muted mt-1">@trade.Time</div>
+            </div>
+            <div class="trade-body">
+                <div class="row g-2 small">
+                    <div class="col-6 col-md-3">
+                        <span class="text-muted">Interval:</span>
+                        <span class="fw-semibold ms-1">@trade.Interval</span>
+                    </div>
+
+                    @if (trade.IsBuy)
+                    {
+                        <div class="col-6 col-md-3">
+                            <span class="text-muted">Shares:</span>
+                            <span class="fw-semibold ms-1">@trade.Shares</span>
+                            <span class="text-muted ms-1">@@ $@trade.Price.ToString("F4")</span>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <span class="text-muted">Cost:</span>
+                            <span class="fw-semibold ms-1">$@trade.Cost.ToString("F2")</span>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <span class="text-muted">Edge:</span>
+                            <span class="fw-semibold @(trade.EdgePercent >= 0 ? "text-success" : "text-danger") ms-1">@(trade.EdgePercent >= 0 ? "+" : "")@trade.EdgePercent.ToString("F1")%</span>
+                            <span class="text-muted ms-1 d-none d-lg-inline">
+                                (model @trade.YourPercent.ToString("F1")%@(trade.ShadedPercent is not null ? $" → shaded {trade.ShadedPercent.Value:F1}%" : "") vs market @trade.MarketPercent.ToString("F1")%@(trade.BarPercent is not null ? $", bar {trade.BarPercent.Value:F1}%" : ""))
+                            </span>
+                        </div>
+                        @if (!string.IsNullOrEmpty(trade.ModelInfo) || !string.IsNullOrEmpty(trade.RegimeInfo) || !string.IsNullOrEmpty(trade.CountRiskInfo))
+                        {
+                            <div class="col-12 text-muted">
+                                @if (!string.IsNullOrEmpty(trade.ModelInfo))
+                                {
+                                    <span class="me-3">Model: <span class="fw-semibold">@trade.ModelInfo</span></span>
+                                }
+                                @if (!string.IsNullOrEmpty(trade.RegimeInfo))
+                                {
+                                    <span class="me-3">Regime: <span class="fw-semibold">@trade.RegimeInfo</span></span>
+                                }
+                                @if (!string.IsNullOrEmpty(trade.CountRiskInfo))
+                                {
+                                    <span>CountRisk: <span class="fw-semibold">@trade.CountRiskInfo</span></span>
+                                }
+                            </div>
+                        }
+                    }
+                    else if (trade.IsSync && !trade.HasPnL)
+                    {
+                        @* SYNC sell with unknown exit — no P&L data *@
+                        <div class="col-6 col-md-3">
+                            <span class="text-muted">Shares:</span>
+                            <span class="fw-semibold ms-1">@trade.Shares</span>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <span class="text-muted">Entry:</span>
+                            <span class="fw-semibold ms-1">$@trade.EntryPrice.ToString("F4")</span>
+                        </div>
+                        @if (!string.IsNullOrEmpty(trade.ExitInfo))
+                        {
+                            <div class="col-6 col-md-3">
+                                <span class="text-muted">Exit:</span>
+                                <span class="fw-semibold text-warning ms-1">@trade.ExitInfo</span>
+                            </div>
+                        }
+                        @if (!string.IsNullOrEmpty(trade.SellReason))
+                        {
+                            <div class="col-12">
+                                <span class="text-muted">Reason:</span>
+                                <span class="text-warning ms-1">@trade.SellReason</span>
+                            </div>
+                        }
+                        @if (!string.IsNullOrEmpty(trade.Note))
+                        {
+                            <div class="col-12">
+                                <span class="text-muted fst-italic">@trade.Note</span>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        @* Regular SELL / EXTERNAL CLOSE / ADJUSTMENT with P&L data *@
+                        <div class="col-6 col-md-3">
+                            <span class="text-muted">Shares:</span>
+                            <span class="fw-semibold ms-1">@trade.Shares</span>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <span class="text-muted">Entry:</span>
+                            <span class="fw-semibold ms-1">$@trade.EntryPrice.ToString("F4")</span>
+                            <span class="text-muted mx-1">→</span>
+                            <span class="text-muted">Exit:</span>
+                            <span class="fw-semibold ms-1">$@trade.CurrentPrice.ToString("F4")</span>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <span class="text-muted">P&amp;L:</span>
+                            <span class="fw-semibold ms-1 @(trade.PnLAmount >= 0 ? "text-success" : "text-danger")">
+                                @(trade.PnLAmount >= 0 ? "+" : "")$@trade.PnLAmount.ToString("F2")
+                            </span>
+                        </div>
+                        @if (trade.GrowthPercent != 0)
+                        {
+                            <div class="col-6 col-md-3">
+                                <span class="text-muted">Growth:</span>
+                                <span class="fw-semibold ms-1 @(trade.GrowthPercent >= 0 ? "text-success" : "text-danger")">
+                                    @(trade.GrowthPercent >= 0 ? "+" : "")@trade.GrowthPercent.ToString("F2")%
+                                </span>
+                            </div>
+                        }
+                        @if (!string.IsNullOrEmpty(trade.SellEdgeRaw))
+                        {
+                            <div class="col-6 col-md-3">
+                                <span class="text-muted">Edge:</span>
+                                <span class="fw-semibold ms-1">@trade.SellEdgeRaw</span>
+                            </div>
+                        }
+                        @if (!string.IsNullOrEmpty(trade.SellReason))
+                        {
+                            <div class="col-6 col-md-3">
+                                <span class="text-muted">Reason:</span>
+                                <span class="fw-semibold text-warning ms-1">@trade.SellReason</span>
+                            </div>
+                        }
+                    }
+
+                    @if (!string.IsNullOrEmpty(trade.OrderId))
+                    {
+                        <div class="col-12">
+                            <span class="text-muted">Order:</span>
+                            <code class="small ms-1 text-break">@trade.OrderId</code>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>;
+
+    private static string CardClass(TradeEntry trade) =>
+        trade.IsBuy ? "trade-buy"
+        : trade.IsAdjustment ? "trade-adjustment"
+        : trade.IsExternalClose ? (trade.PnLAmount >= 0 ? "trade-win" : "trade-sell")
+        : trade.IsWin ? "trade-win"
+        : trade.IsSync ? "trade-sync"
+        : "trade-sell";
+
+    private static string TypeBadge(TradeEntry trade) =>
+        trade.IsBuy ? "bg-success"
+        : trade.IsAdjustment ? "bg-warning"
+        : "bg-danger";
+
+    private async Task OnPasswordSubmit()
+    {
+        if (string.Equals(_loginModel.Password, AccessPassword, StringComparison.Ordinal))
+        {
+            _authenticated = true;
+            _loginFailed = false;
+            await RefreshData();
+            TradingV2ChangeNotifier.TradingDataChanged += HandleDataChangedAsync;
+        }
+        else
+        {
+            _loginFailed = true;
+        }
+
+        _loginModel.Password = "";
+    }
+
+    private async Task HandleDataChangedAsync()
+    {
+        await InvokeAsync(async () =>
+        {
+            await RefreshData();
+            StateHasChanged();
+        });
+    }
+
+    private async Task RefreshData()
+    {
+        _session = await TradingV2LogService.GetSessionAsync();
+        _initialLoadCompleted = true;
+    }
+
+    public void Dispose()
+    {
+        TradingV2ChangeNotifier.TradingDataChanged -= HandleDataChangedAsync;
+    }
+
+    private sealed class LoginModel
+    {
+        public string Password { get; set; } = "";
+    }
+
+    private sealed class TradePair
+    {
+        public required TradeEntry Buy { get; set; }
+        public TradeEntry? Sell { get; set; }
+    }
+
+    private List<TradePair> GroupTradesIntoPairs(List<TradeEntry> trades)
+    {
+        var pairs = new List<TradePair>();
+        var openBuys = new Queue<TradeEntry>();
+
+        // Walk in chronological order so the first buy matches the first sell (FIFO)
+        foreach (var trade in trades)
+        {
+            if (trade.IsBuy)
+            {
+                openBuys.Enqueue(trade);
+            }
+            else
+            {
+                if (openBuys.Count > 0)
+                {
+                    // Pair this sell with its corresponding buy
+                    pairs.Add(new TradePair { Buy = openBuys.Dequeue(), Sell = trade });
+                }
+                else
+                {
+                    // Orphan sell with no matching buy
+                    pairs.Add(new TradePair { Buy = trade, Sell = null });
+                }
+            }
+        }
+
+        // Remaining open buys that have no sell yet (still open positions)
+        while (openBuys.Count > 0)
+        {
+            pairs.Add(new TradePair { Buy = openBuys.Dequeue(), Sell = null });
+        }
+
+        // Reverse to show newest pairs first
+        pairs.Reverse();
+
+        return pairs;
+    }
+}

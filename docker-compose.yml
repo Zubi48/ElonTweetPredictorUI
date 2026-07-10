@@ -11,10 +11,12 @@ services:
       ASPNETCORE_URLS: http://0.0.0.0:8080
       ASPNETCORE_ENVIRONMENT: Production
       DataPath: /app/data
+      DataPathV2: /app/data-v2
       TZ: America/New_York
       PredictorContainerName: elon-tweet-predictor
     volumes:
       - predictor-data:/app/data
+      - polymarket-bot-v2-data:/app/data-v2
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - proxy
@@ -38,3 +40,6 @@ volumes:
   predictor-data:
     external: true
     name: elon-tweet-predictor-data
+  polymarket-bot-v2-data:
+    external: true
+    name: polymarket-bot-v2-data
