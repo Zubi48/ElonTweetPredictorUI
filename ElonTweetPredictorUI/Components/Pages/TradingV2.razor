@@ -339,35 +339,36 @@ else
 
     private List<TradePair> GroupTradesIntoPairs(List<TradeEntry> trades)
     {
+        // The v2 bot holds positions in several markets at once, so a sell must
+        // be matched to the open buy for the same event + interval (FIFO within
+        // that market), not just the oldest open buy overall.
         var pairs = new List<TradePair>();
-        var openBuys = new Queue<TradeEntry>();
+        var openByMarket = new Dictionary<string, Queue<TradePair>>();
 
-        // Walk in chronological order so the first buy matches the first sell (FIFO)
+        // Walk in chronological order; pairs keep the buy order
         foreach (var trade in trades)
         {
+            var key = $"{trade.Event}|{trade.Interval}";
+
             if (trade.IsBuy)
             {
-                openBuys.Enqueue(trade);
+                var pair = new TradePair { Buy = trade };
+                pairs.Add(pair);
+
+                if (!openByMarket.TryGetValue(key, out var queue))
+                    openByMarket[key] = queue = new Queue<TradePair>();
+                queue.Enqueue(pair);
+            }
+            else if (openByMarket.TryGetValue(key, out var queue) && queue.Count > 0)
+            {
+                // Pair this sell with the earliest open buy in the same market
+                queue.Dequeue().Sell = trade;
             }
             else
             {
-                if (openBuys.Count > 0)
-                {
-                    // Pair this sell with its corresponding buy
-                    pairs.Add(new TradePair { Buy = openBuys.Dequeue(), Sell = trade });
-                }
-                else
-                {
-                    // Orphan sell with no matching buy
-                    pairs.Add(new TradePair { Buy = trade, Sell = null });
-                }
+                // Orphan sell with no matching buy
+                pairs.Add(new TradePair { Buy = trade, Sell = null });
             }
-        }
-
-        // Remaining open buys that have no sell yet (still open positions)
-        while (openBuys.Count > 0)
-        {
-            pairs.Add(new TradePair { Buy = openBuys.Dequeue(), Sell = null });
         }
 
         // Reverse to show newest pairs first
